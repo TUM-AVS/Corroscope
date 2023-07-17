@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-use bevy_egui::{EguiPlugin, EguiContexts};
 use bevy_editor_pls::prelude::*;
+use bevy_egui::{EguiContexts, EguiPlugin};
 
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
@@ -10,7 +10,7 @@ use bevy_prototype_lyon::prelude::*;
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 
 use commonroad_pb::{integer_exact_or_interval, CommonRoad};
-use egui::plot::{PlotPoints, PlotBounds};
+use egui::plot::{PlotBounds, PlotPoints};
 use prost::Message;
 use std::fs::File;
 use std::io::Read;
@@ -30,8 +30,7 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     let mut app = App::new();
 
-    app
-        .insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
+    app.insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
         .insert_resource(Msaa::Sample4)
         .insert_resource(cr)
         .init_resource::<CurrentTimeStep>()
@@ -55,25 +54,18 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_plugin(EguiPlugin)
         .add_plugin(ShapePlugin)
         .add_plugin(bevy_pancam::PanCamPlugin::default())
-
         .add_startup_system(camera_setup)
-        
         .add_startup_system(setup)
-
         .add_system(plot_obs)
-
         .add_system(obstacle_tooltip)
-
-        .add_system(side_panel)
-        ;
+        .add_system(side_panel);
 
     // #[cfg(debug)]
     // app.add_plugin(WorldInspectorPlugin::new());
 
     app.add_plugin(EditorPlugin::default());
 
-    app
-        .run();
+    app.run();
 
     Ok(())
 }
@@ -82,16 +74,19 @@ fn main() -> color_eyre::eyre::Result<()> {
 pub struct MainCamera;
 
 fn camera_setup(mut commands: Commands) {
-    commands.spawn((
-        MainCamera,
-        RaycastPickCamera::default(),
-        Camera2dBundle {
-        projection: OrthographicProjection {
-            scale: 0.1, // 0.001,
-            ..default()
-        },
-        ..default()
-    })).insert(bevy_pancam::PanCam::default());
+    commands
+        .spawn((
+            MainCamera,
+            RaycastPickCamera::default(),
+            Camera2dBundle {
+                projection: OrthographicProjection {
+                    scale: 0.1, // 0.001,
+                    ..default()
+                },
+                ..default()
+            },
+        ))
+        .insert(bevy_pancam::PanCam::default());
 }
 
 fn read_cr() -> commonroad_pb::CommonRoad {
@@ -118,15 +113,21 @@ pub struct RightBound;
 pub struct LaneletBackground;
 
 fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
-    let lbound_pts = lanelet.left_bound
-        .points.iter().map(|p| Vec2::new(p.x as f32, p.y as f32));
-    let rbound_pts = lanelet.right_bound
-        .points.iter().map(|p| Vec2::new(p.x as f32, p.y as f32));
-   
+    let lbound_pts = lanelet
+        .left_bound
+        .points
+        .iter()
+        .map(|p| Vec2::new(p.x as f32, p.y as f32));
+    let rbound_pts = lanelet
+        .right_bound
+        .points
+        .iter()
+        .map(|p| Vec2::new(p.x as f32, p.y as f32));
+
     let mut fpoints = vec![];
     fpoints.extend(lbound_pts.clone());
     fpoints.extend(rbound_pts.clone().rev());
-    
+
     let ll_shape = bevy_prototype_lyon::shapes::Polygon {
         points: fpoints,
         closed: false,
@@ -155,7 +156,7 @@ fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
         ShapeBundle {
             path: GeometryBuilder::build_as(&lb_shape),
             ..default()
-        },        
+        },
         Stroke::new(Color::CYAN, 0.1),
     ));
 
@@ -171,14 +172,12 @@ fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
 
 fn state_transform(state: &commonroad_pb::State) -> Option<Transform> {
     let position: Vec2 = match state.position.as_ref()? {
-        commonroad_pb::state::Position::Point(p) => {
-            Vec2::from(p.clone())
-        },
-        _ => unimplemented!()
+        commonroad_pb::state::Position::Point(p) => Vec2::from(p.clone()),
+        _ => unimplemented!(),
     };
     let angle = match state.orientation.as_ref()?.exact_or_interval.as_ref()? {
         commonroad_pb::float_exact_or_interval::ExactOrInterval::Exact(e) => *e as f32,
-        _ => unimplemented!()
+        _ => unimplemented!(),
     };
 
     let mut t = Transform::from_translation(position.extend(1.0));
@@ -218,50 +217,38 @@ fn obstacle_tooltip(
                 ui.heading(format!("Obstacle {}", obs.dynamic_obstacle_id));
 
                 ui.label(format!("initial state: {:?}", obs.initial_state));
-            });
+            },
+        );
     }
 }
 
-fn spawn_obstacle(
-    commands: &mut Commands,
-    obs: &commonroad_pb::DynamicObstacle,
-) {
+fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObstacle) {
     let shape = match obs.shape.shape.as_ref().unwrap() {
-        commonroad_pb::shape::Shape::Rectangle(r) => {
-            bevy_prototype_lyon::shapes::Rectangle {
-                extents: Vec2::new(r.length as f32, r.width as f32),
-                origin: RectangleOrigin::Center,
-            }
+        commonroad_pb::shape::Shape::Rectangle(r) => bevy_prototype_lyon::shapes::Rectangle {
+            extents: Vec2::new(r.length as f32, r.width as f32),
+            origin: RectangleOrigin::Center,
         },
-        _ => unimplemented!()
+        _ => unimplemented!(),
     };
-
 
     commands.spawn((
         ObstacleData(obs.to_owned()),
-
         ShapeBundle {
             path: GeometryBuilder::build_as(&shape),
             transform: state_transform(&obs.initial_state).unwrap(),
 
             ..default()
         },
-        
         Fill::color(Color::WHITE),
         Stroke::new(Color::ORANGE, 0.4),
-
         PickableBundle::default(),
         RaycastPickTarget::default(),
-
         On::<Pointer<Down>>::target_commands_mut(|_click, _commands| {
             bevy::log::info!("clicked obstacle!");
         }),
-
-        
         On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
             commands.insert(HoveredObstacle);
         }),
-
         On::<Pointer<Out>>::target_commands_mut(|_click, commands| {
             commands.remove::<HoveredObstacle>();
         }),
@@ -273,15 +260,15 @@ fn spawn_obstacle(
     for st in &traj.trajectory.states {
         let time_step = match st.time_step.exact_or_interval {
             Some(integer_exact_or_interval::ExactOrInterval::Exact(i)) => i,
-            _ => unimplemented!()
+            _ => unimplemented!(),
         };
         let ts_color = Color::rgba_u8(
-            130_u8.saturating_sub( (time_step as u8).saturating_mul(2) ),
+            130_u8.saturating_sub((time_step as u8).saturating_mul(2)),
             50,
             140,
-            100_u8.saturating_sub( (time_step as u8).saturating_mul(4) )
+            100_u8.saturating_sub((time_step as u8).saturating_mul(4)),
         );
-        
+
         commands.spawn((
             ShapeBundle {
                 path: GeometryBuilder::build_as(&shape),
@@ -328,11 +315,7 @@ struct CurrentTimeStep {
     time_step: i32,
 }
 
-fn side_panel(
-    mut contexts: EguiContexts,
-
-    mut cts: ResMut<CurrentTimeStep>,
-) {
+fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>) {
     let ctx = contexts.ctx_mut();
 
     let panel_id = egui::Id::new("side panel left");
@@ -340,23 +323,19 @@ fn side_panel(
         .exact_width(400.0)
         .show(ctx, |ui| {
             ui.style_mut().spacing.slider_width = 250.0;
-            ui.add( 
+            ui.add(
                 egui::Slider::new(&mut cts.time_step, 0..=40)
                     .text("time step")
                     .step_by(1.0)
-                    .clamp_to_range(true)
+                    .clamp_to_range(true),
             );
         });
 }
 
-fn plot_obs(
-    mut contexts: EguiContexts,
-    cr: Res<CommonRoad>,
-) {
+fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
     let ctx = contexts.ctx_mut();
 
-    egui::Window::new("Obstacle Velocity")
-        .show(ctx, |ui| {
+    egui::Window::new("Obstacle Velocity").show(ctx, |ui| {
         egui::plot::Plot::new("velocity_plot")
             // .clamp_grid(true)
             .legend(egui::plot::Legend::default())
@@ -367,10 +346,7 @@ fn plot_obs(
                 for obs in &cr.dynamic_obstacles {
                     let pp = velocity_points(obs).unwrap();
                     let line = egui::plot::Line::new(pp)
-                        .name(format!("velocity [m/s] for {}", obs.dynamic_obstacle_id))
-                        
-                        
-                        ; //.shape(Mark);
+                        .name(format!("velocity [m/s] for {}", obs.dynamic_obstacle_id)); //.shape(Mark);
                     pui.line(line);
 
                     pui.set_plot_bounds(PlotBounds::from_min_max([1.0, 0.0], [40.0, 20.0]));
@@ -378,8 +354,6 @@ fn plot_obs(
 
                     //pui.points(points);
                 }
-
             });
     });
 }
-
