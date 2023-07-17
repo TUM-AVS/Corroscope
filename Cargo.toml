@@ -1,0 +1,65 @@
+[package]
+name = "corroscope"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+#[lib]
+#name = "corroscope"
+
+[dependencies]
+# nalgebra = "0.32.3"
+bevy = { version = "^0.10.1", default_features = false, features = [
+    "bevy_asset",
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_scene",
+    #"bevy_sprite",
+    #"bevy_text",
+    #"subpixel_glyph_atlas",
+    "bevy_winit",
+    # "bevy_dynamic_plugin",
+    # cargo run --features bevy/dynamic_linking
+    "dynamic_linking",
+    "wayland"
+    ] }
+bevy_prototype_lyon = "^0.8.0"
+bevy_egui = { version = "^0.20.3" }
+bevy_pancam = { version = "0.8", features = [ "bevy_egui" ] }
+bevy_mod_picking = { version = "0.14.0", features = [ "backend_egui" ] }
+egui = { version = "0.21.0", features = [
+    "mint",
+    "extra_debug_asserts"
+    ] }
+# emath = "^0.21.0"
+mint = "^0.5.9"
+
+color-eyre = "0.5"
+
+#[dev-dependencies]
+rand = "^0.8.5"
+bevy_framepace = "0.12.1"
+bevy-inspector-egui = "0.18.3"
+bevy_editor_pls = "0.4.0"
+
+
+bytes = "1"
+prost = "0.11.8"
+
+petgraph = "0.6.3"
+
+glam = "0.24.1"
+
+[build-dependencies]
+prost-build = "0.11.8"
+
+
+# Enable max optimizations for dependencies, but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.package.backtrace]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
