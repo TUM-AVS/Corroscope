@@ -1466,6 +1466,8 @@ dependencies = [
  "color-eyre",
  "egui",
  "glam 0.24.1",
+ "lyon_algorithms",
+ "lyon_path",
  "mint",
  "petgraph",
  "prost",

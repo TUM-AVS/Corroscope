@@ -16,6 +16,17 @@ impl From<commonroad_pb::Point> for egui::Pos2 {
     }
 }
 
+impl TryFrom<commonroad_pb::state::Position> for Vec2 {
+    type Error = ();
+
+    fn try_from(value: commonroad_pb::state::Position) -> Result<Self, Self::Error> {
+        match value {
+            commonroad_pb::state::Position::Point(p) => Ok(p.into()),
+            _ => Err(()),
+        }
+    }
+}
+
 impl TryFrom<commonroad_pb::state::Position> for egui::Pos2 {
     type Error = ();
 
@@ -26,6 +37,7 @@ impl TryFrom<commonroad_pb::state::Position> for egui::Pos2 {
         }
     }
 }
+
 
 impl TryFrom<commonroad_pb::FloatExactOrInterval> for f64 {
     type Error = ();
