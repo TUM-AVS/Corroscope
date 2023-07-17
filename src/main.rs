@@ -9,13 +9,15 @@ use bevy_prototype_lyon::prelude::*;
 
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 
-use commonroad_pb::{integer_exact_or_interval, CommonRoad, float_exact_or_interval};
+use commonroad_pb::{integer_exact_or_interval, CommonRoad};
 use egui::plot::{PlotPoints, PlotBounds};
 use prost::Message;
 use std::fs::File;
 use std::io::Read;
 
 use bevy_mod_picking::prelude::*;
+
+mod conversion;
 
 pub mod commonroad_pb;
 
@@ -32,6 +34,7 @@ fn main() -> color_eyre::eyre::Result<()> {
         .insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
         .insert_resource(Msaa::Sample4)
         .insert_resource(cr)
+        .init_resource::<CurrentTimeStep>()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Corroscope".into(),
@@ -58,6 +61,10 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_startup_system(setup)
 
         .add_system(plot_obs)
+
+        .add_system(obstacle_tooltip)
+
+        .add_system(side_panel)
         ;
 
     // #[cfg(debug)]
@@ -162,12 +169,6 @@ fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
     ));
 }
 
-impl From<commonroad_pb::Point> for Vec2 {
-    fn from(value: commonroad_pb::Point) -> Self {
-        Vec2::new(value.x as f32, value.y as f32)
-    }
-}
-
 fn state_transform(state: &commonroad_pb::State) -> Option<Transform> {
     let position: Vec2 = match state.position.as_ref()? {
         commonroad_pb::state::Position::Point(p) => {
@@ -180,12 +181,51 @@ fn state_transform(state: &commonroad_pb::State) -> Option<Transform> {
         _ => unimplemented!()
     };
 
-    let mut t = Transform::from_translation(position.clone().extend(1.0));
+    let mut t = Transform::from_translation(position.extend(1.0));
     t.rotate_z(angle);
     Some(t)
 }
 
-fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObstacle) {
+#[derive(Component)]
+pub struct ObstacleData(commonroad_pb::DynamicObstacle);
+
+#[derive(Component)]
+pub struct HoveredObstacle;
+
+fn obstacle_tooltip(
+    mut contexts: EguiContexts,
+
+    obstacle_q: Query<(&ObstacleData, &Transform), With<HoveredObstacle>>,
+) {
+    let ctx = contexts.ctx_mut();
+
+    let base_id = egui::Id::new("obstacle tooltip");
+    for (ObstacleData(obs), transform) in obstacle_q.iter() {
+        let tt_pos: egui::Pos2 = obs
+            .initial_state
+            .position
+            .as_ref()
+            .unwrap()
+            .to_owned()
+            .try_into()
+            .unwrap();
+
+        egui::containers::show_tooltip_at(
+            ctx,
+            base_id.with(obs.dynamic_obstacle_id),
+            Some(tt_pos),
+            |ui| {
+                ui.heading(format!("Obstacle {}", obs.dynamic_obstacle_id));
+
+                ui.label(format!("initial state: {:?}", obs.initial_state));
+            });
+    }
+}
+
+fn spawn_obstacle(
+    commands: &mut Commands,
+    obs: &commonroad_pb::DynamicObstacle,
+) {
     let shape = match obs.shape.shape.as_ref().unwrap() {
         commonroad_pb::shape::Shape::Rectangle(r) => {
             bevy_prototype_lyon::shapes::Rectangle {
@@ -198,6 +238,8 @@ fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObstacle)
 
 
     commands.spawn((
+        ObstacleData(obs.to_owned()),
+
         ShapeBundle {
             path: GeometryBuilder::build_as(&shape),
             transform: state_transform(&obs.initial_state).unwrap(),
@@ -211,33 +253,43 @@ fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObstacle)
         PickableBundle::default(),
         RaycastPickTarget::default(),
 
-        On::<Pointer<Over>>::target_commands_mut(|_click, _commands| {
+        On::<Pointer<Down>>::target_commands_mut(|_click, _commands| {
             bevy::log::info!("clicked obstacle!");
+        }),
+
+        
+        On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
+            commands.insert(HoveredObstacle);
+        }),
+
+        On::<Pointer<Out>>::target_commands_mut(|_click, commands| {
+            commands.remove::<HoveredObstacle>();
         }),
     ));
 
-    if let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) = &obs.prediction {
-        for st in &traj.trajectory.states {
-            let time_step = match st.time_step.exact_or_interval {
-                Some(integer_exact_or_interval::ExactOrInterval::Exact(i)) => i,
-                _ => unimplemented!()
-            };
-            let ts_color = Color::rgba_u8(
-                130_u8.saturating_sub( (time_step as u8).saturating_mul(2) ),
-                50,
-                140,
-                100_u8.saturating_sub( (time_step as u8).saturating_mul(4) )
-            );
-            
-            commands.spawn((
-                ShapeBundle {
-                    path: GeometryBuilder::build_as(&shape),
-                    transform: state_transform(&st).unwrap(),
-                    ..default()
-                },
-                Fill::color(ts_color),
-            ));
-        }
+    let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) = &obs.prediction
+        else { return; };
+
+    for st in &traj.trajectory.states {
+        let time_step = match st.time_step.exact_or_interval {
+            Some(integer_exact_or_interval::ExactOrInterval::Exact(i)) => i,
+            _ => unimplemented!()
+        };
+        let ts_color = Color::rgba_u8(
+            130_u8.saturating_sub( (time_step as u8).saturating_mul(2) ),
+            50,
+            140,
+            100_u8.saturating_sub( (time_step as u8).saturating_mul(4) )
+        );
+        
+        commands.spawn((
+            ShapeBundle {
+                path: GeometryBuilder::build_as(&shape),
+                transform: state_transform(st).unwrap(),
+                ..default()
+            },
+            Fill::color(ts_color),
+        ));
     }
 }
 
@@ -250,45 +302,6 @@ fn setup(mut commands: Commands) {
     }
     for lanelet in &cr.lanelets {
         spawn_lanelet(&mut commands, lanelet);
-    }
-}
-
-impl TryFrom<commonroad_pb::FloatExactOrInterval> for f64 {
-    type Error = ();
-
-    fn try_from(value: commonroad_pb::FloatExactOrInterval) -> Result<Self, Self::Error> {
-        TryFrom::try_from(value.exact_or_interval.ok_or(())?)
-    }
-}
-
-impl TryFrom<commonroad_pb::float_exact_or_interval::ExactOrInterval> for f64 {
-    type Error = ();
-
-    fn try_from(value: commonroad_pb::float_exact_or_interval::ExactOrInterval) -> Result<Self, Self::Error> {
-        match value {
-            float_exact_or_interval::ExactOrInterval::Exact(e) => Ok(e),
-            _ => Err(()) ,
-        }
-    }
-}
-
-
-impl TryFrom<commonroad_pb::IntegerExactOrInterval> for i32 {
-    type Error = ();
-
-    fn try_from(value: commonroad_pb::IntegerExactOrInterval) -> Result<Self, Self::Error> {
-        TryFrom::try_from(value.exact_or_interval.ok_or(())?)
-    }
-}
-
-impl TryFrom<commonroad_pb::integer_exact_or_interval::ExactOrInterval> for i32 {
-    type Error = ();
-
-    fn try_from(value: commonroad_pb::integer_exact_or_interval::ExactOrInterval) -> Result<Self, Self::Error> {
-        match value {
-            integer_exact_or_interval::ExactOrInterval::Exact(e) => Ok(e),
-            _ => Err(()) ,
-        }
     }
 }
 
@@ -310,31 +323,49 @@ fn velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
     Some(PlotPoints::new(velocity_pts))
 }
 
+#[derive(Default, Resource)]
+struct CurrentTimeStep {
+    time_step: i32,
+}
+
+fn side_panel(
+    mut contexts: EguiContexts,
+
+    mut cts: ResMut<CurrentTimeStep>,
+) {
+    let ctx = contexts.ctx_mut();
+
+    let panel_id = egui::Id::new("side panel left");
+    egui::SidePanel::left(panel_id)
+        .exact_width(400.0)
+        .show(ctx, |ui| {
+            ui.style_mut().spacing.slider_width = 250.0;
+            ui.add( 
+                egui::Slider::new(&mut cts.time_step, 0..=40)
+                    .text("time step")
+                    .step_by(1.0)
+                    .clamp_to_range(true)
+            );
+        });
+}
+
 fn plot_obs(
     mut contexts: EguiContexts,
     cr: Res<CommonRoad>,
 ) {
     let ctx = contexts.ctx_mut();
 
-    let first_obs = cr.dynamic_obstacles.iter().next().unwrap();
-    let pp = velocity_points(first_obs).unwrap();
-
-    egui::containers::show_tooltip(
-        ctx,
-        egui::Id::new("obstacle tooltip"),
-        |ui| {
-            ui.label("hello world!");
-        });
-
     egui::Window::new("Obstacle Velocity")
         .show(ctx, |ui| {
         egui::plot::Plot::new("velocity_plot")
             // .clamp_grid(true)
             .legend(egui::plot::Legend::default())
-            
+            .view_aspect(2.0)
+            .min_size(egui::Vec2::new(400.0, 200.0))
+            .sharp_grid_lines(true)
             .show(ui, |pui| {
                 for obs in &cr.dynamic_obstacles {
-                    let pp = velocity_points(&obs).unwrap();
+                    let pp = velocity_points(obs).unwrap();
                     let line = egui::plot::Line::new(pp)
                         .name(format!("velocity [m/s] for {}", obs.dynamic_obstacle_id))
                         
