@@ -4,6 +4,12 @@ use crate::commonroad_pb;
 
 use commonroad_pb::{float_exact_or_interval, integer_exact_or_interval};
 
+impl From<&commonroad_pb::Point> for Vec2 {
+    fn from(value: &commonroad_pb::Point) -> Self {
+        Vec2::new(value.x as f32, value.y as f32)
+    }
+}
+
 impl From<commonroad_pb::Point> for Vec2 {
     fn from(value: commonroad_pb::Point) -> Self {
         Vec2::new(value.x as f32, value.y as f32)

@@ -9,7 +9,6 @@ use bevy_prototype_lyon::prelude::*;
 
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 
-use bevy_prototype_lyon::prelude::tess::path::Path;
 use commonroad_pb::{integer_exact_or_interval, CommonRoad};
 use egui::plot::{PlotBounds, PlotPoints};
 use prost::Message;
@@ -27,7 +26,13 @@ impl Resource for CommonRoad {}
 fn main() -> color_eyre::eyre::Result<()> {
     color_eyre::install()?;
 
-    let cr = read_cr();
+
+    // let path = "DEU_Muc-2_1_T-1.pb";
+    // let path = "../pb_scenarios/ZAM_Tjunction-1_41_T-1.pb";
+    let path = "../pb_scenarios/DEU_Muc-4_1_T-1.pb";
+    let f = File::open(path).unwrap();
+    // let mut f = File::open("USA_Lanker-1_1_T-1.pb").unwrap();
+    let cr = read_cr(f);
     // cr.information.time_step_size
 
     let mut app = App::new();
@@ -49,7 +54,7 @@ fn main() -> color_eyre::eyre::Result<()> {
             }),
             ..default()
         }))
-        .add_plugins(DefaultPickingPlugins)
+        // .add_plugins(DefaultPickingPlugins)
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(bevy_framepace::FramepacePlugin)
@@ -58,11 +63,21 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_plugin(bevy_pancam::PanCamPlugin::default())
         .add_startup_system(camera_setup)
         .add_startup_system(setup)
-        // .add_system(plot_obs)
+        .add_system(plot_obs)
         .add_system(obstacle_tooltip)
         .add_system(trajectory_animation)
         .add_system(side_panel);
 
+    use bevy_mod_picking::debug::DebugPickingMode::{Normal, Disabled};
+    app.add_plugins(DefaultPickingPlugins)
+        .insert_resource(State(Disabled))
+        .add_systems(
+            (
+                (|mut next: ResMut<NextState<_>>| next.set(Normal)).run_if(in_state(Disabled)),
+                (|mut next: ResMut<NextState<_>>| next.set(Disabled)).run_if(in_state(Normal)),
+            )
+                .distributive_run_if(bevy::input::common_conditions::input_just_pressed(KeyCode::F3)),
+        );
 
     // #[cfg(debug)]
     // app.add_plugin(WorldInspectorPlugin::new());
@@ -73,6 +88,7 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     Ok(())
 }
+
 
 #[derive(Component)]
 pub struct MainCamera;
@@ -93,14 +109,11 @@ fn camera_setup(mut commands: Commands) {
         .insert(bevy_pancam::PanCam::default());
 }
 
-fn read_cr() -> commonroad_pb::CommonRoad {
-    let mut f = File::open("DEU_Muc-2_1_T-1.pb").unwrap();
-    // let mut f = File::open("USA_Lanker-1_1_T-1.pb").unwrap();
-
+fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
     let mut buffer = Vec::new();
 
     // read the whole file
-    f.read_to_end(&mut buffer).unwrap();
+    file.read_to_end(&mut buffer).unwrap();
 
     let buf = bytes::Bytes::from(buffer);
 
@@ -116,26 +129,25 @@ pub struct RightBound;
 #[derive(Component)]
 pub struct LaneletBackground;
 
-fn make_dashed(path: &lyon_path::Path) -> lyon_path::Path {
-    use lyon_algorithms::{
-        math::point,
-        path::Path,
-        length::approximate_length,
-        measure::{PathMeasurements, SampleType},
-    };
+#[derive(Component)]
+pub struct Lanelet;
+
+fn make_dashed(path: &lyon_path::Path, dash_length: f32, dash_ratio: f32) -> lyon_path::Path {
+    use lyon_algorithms::measure::{PathMeasurements, SampleType};
 
     let measurements = PathMeasurements::from_path(path, 1e-3);
     let mut sampler = measurements.create_sampler(path, SampleType::Distance);
     let rb_length = sampler.length();
 
-    let dash_length = 0.5;
-    let dash_count = (rb_length / (2.0 * dash_length)).floor() as i32;
+    debug_assert!(dash_ratio < 1.0);
+
+    let dash_count = (rb_length / dash_length).ceil() as i32;
 
     let mut builder = lyon_path::Path::builder();
- 
+
     for i in 0..dash_count {
-        let dash_start = i as f32 * (2.0 * dash_length);
-        let dash_end   = i as f32 * (2.0 * dash_length) + dash_length;
+        let dash_start = i as f32 * dash_length;
+        let dash_end   = i as f32 * dash_length + dash_ratio * dash_length;
 
         sampler.split_range(dash_start..dash_end, &mut builder);
     }
@@ -143,7 +155,7 @@ fn make_dashed(path: &lyon_path::Path) -> lyon_path::Path {
     builder.build()
 }
 
-fn spawn_bound(commands: &mut Commands, bound: &commonroad_pb::Bound) {
+fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
     let bound_pts = bound
         .points
         .iter()
@@ -154,12 +166,40 @@ fn spawn_bound(commands: &mut Commands, bound: &commonroad_pb::Bound) {
         closed: false,
     };
     let rb_path = GeometryBuilder::build_as(&rb_shape);
-    
-    let dashed_path = Path(make_dashed(&rb_path.0));
+
+    let dashed_path = Path(make_dashed(&rb_path.0, 0.8, 0.5));
+    let short_dashed_path = Path(make_dashed(&rb_path.0, 0.2, 0.5));
 
     let marking_color = Color::CRIMSON;
-    let normal_stroke = Stroke::new(marking_color, 0.1);
-    let broad_stroke = Stroke::new(marking_color, 0.2);
+    let stroke_opts = {
+        let mut opts = StrokeOptions::default();
+        opts.start_cap = LineCap::Round;
+        opts.end_cap = LineCap::Round;
+        opts.line_join = LineJoin::Round;
+        opts.line_width = 0.1;
+        opts.tolerance = 1e-4;
+        opts
+    };
+    let normal_stroke = Stroke {
+        color: marking_color,
+        options: stroke_opts, // st 0.1
+    };
+    let broad_stroke = Stroke {
+        color: marking_color,
+        options: {
+            let mut opts = stroke_opts;
+            opts.line_width = 0.2;
+            opts
+        },
+    };
+    let light_stroke = Stroke {
+        color: Color::LIME_GREEN.with_a(0.5),
+        options: {
+            let mut opts = stroke_opts;
+            opts.line_width = 0.07;
+            opts
+        },
+    };
 
     use crate::commonroad_pb::line_marking_enum::LineMarking;
 
@@ -170,71 +210,97 @@ fn spawn_bound(commands: &mut Commands, bound: &commonroad_pb::Bound) {
         LineMarking::BroadDashed => { (dashed_path, normal_stroke) },
         LineMarking::Unknown => {
             bevy::log::info!("lanelet bound has unknown line marking");
-            return;
+
+            (short_dashed_path, light_stroke)
         },
         LineMarking::NoMarking => {
             bevy::log::info!("lanelet bound has no line marking");
 
-            return;
+            (short_dashed_path, light_stroke)
         },
     };
 
-    commands.spawn((
-        RightBound,
+    dbg!(id);
+
+    Some((
         ShapeBundle {
-            path, // GeometryBuilder::build_as(&rb_shape),
+            path,
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 2.0 + (id as f32 * 1e-2))),
             ..default()
         },
         stroke,
-    ));
+    ))
 
 }
 
-fn spawn_lanelet(mut commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
-    // lanelet.left_bound.line_marking
-    spawn_bound(&mut commands, &lanelet.left_bound);
-    spawn_bound(&mut commands, &lanelet.right_bound);
+fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
+    if let Some(stop_line) = &lanelet.stop_line {
+        let stop_line_shape: shapes::Polygon = bevy_prototype_lyon::shapes::Polygon {
+            points: stop_line.points.iter().map(Into::into).collect(),
+            closed: false,
+        };
+        commands.spawn((
+            Name::new("stop line"),
+            ShapeBundle {
+                path: GeometryBuilder::build_as(&stop_line_shape),
+                transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                ..default()
+            },
+            Fill::color(Color::BLACK),
+        ));
+    };
 
     let lbound_pts = lanelet
         .left_bound
         .points
         .iter()
-        .map(|p| Vec2::new(p.x as f32, p.y as f32));
+        .map(|p| Into::<Vec2>::into(p));
     let rbound_pts = lanelet
         .right_bound
         .points
         .iter()
-        .map(|p| Vec2::new(p.x as f32, p.y as f32));
+        .map(|p| Into::<Vec2>::into(p));
 
-    let mut fpoints = vec![];
+    let mut fpoints: Vec<Vec2> = vec![];
     fpoints.extend(lbound_pts.clone());
     fpoints.extend(rbound_pts.clone().rev());
 
-    let ll_shape = bevy_prototype_lyon::shapes::Polygon {
+    let ll_shape: shapes::Polygon = bevy_prototype_lyon::shapes::Polygon {
         points: fpoints,
         closed: false,
     };
-  
-    let lb_shape = bevy_prototype_lyon::shapes::Polygon {
-        points: lbound_pts.collect(),
-        closed: false,
-    };
-    let rb_shape = bevy_prototype_lyon::shapes::Polygon {
-        points: rbound_pts.collect(),
-        closed: false,
-    };
-    let rb_path = GeometryBuilder::build_as(&rb_shape);
-    
-    let dashed_path = make_dashed(&rb_path.0);
+
+    let main_entity = commands.spawn((
+        Name::new("lanelet"),
+        Lanelet,
+        SpatialBundle::default(),
+    )).id();
 
     commands.spawn((
+        Name::new("background"),
         LaneletBackground,
         ShapeBundle {
             path: GeometryBuilder::build_as(&ll_shape),
+            transform: Transform::from_xyz(0.0, 0.0, 1.0),
             ..default()
         },
         Fill::color(Color::GRAY),
-    ));
+    )).set_parent_in_place(main_entity);
+
+    if let Some(bound) = spawn_bound(&lanelet.left_bound, lanelet.lanelet_id) {
+        commands.spawn((
+            Name::new("left bound"),
+            LeftBound,
+            bound,
+        )).set_parent(main_entity);
+    }
+    if let Some(bound) = spawn_bound(&lanelet.right_bound, lanelet.lanelet_id) {
+        commands.spawn((
+            Name::new("right bound"),
+            RightBound,
+            bound,
+        )).set_parent(main_entity);
+    }
 /*
     commands.spawn((
         LeftBound,
@@ -295,14 +361,19 @@ fn obstacle_tooltip(
             .try_into()
             .unwrap();
 
-        egui::containers::show_tooltip_at(
+        egui::containers::show_tooltip(
             ctx,
             base_id.with(obs.dynamic_obstacle_id),
-            Some(tt_pos),
+            // Some(tt_pos),
             |ui| {
-                ui.heading(format!("Obstacle {}", obs.dynamic_obstacle_id));
+                ui.heading(format!("Obstacle {} (type {:#?})", obs.dynamic_obstacle_id, obs.obstacle_type()));
+                // ui.label(format!("type: {:#?}", obs.obstacle_type()));
 
-                ui.label(format!("initial state: {:?}", obs.initial_state));
+
+                ui.label(format!("signal series: {:#?}", obs.signal_series));
+                ui.label(format!("initial signal state: {:#?}", obs.initial_signal_state));
+
+                // ui.label(format!("initial state: {:#?}", obs.initial_state));
             },
         );
     }
@@ -316,12 +387,22 @@ fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObstacle)
         },
         _ => unimplemented!(),
     };
+    let rect_path: bevy_prototype_lyon::prelude::Path = GeometryBuilder::build_as(&shape);
+    let simple_marker = bevy_prototype_lyon::shapes::Circle {
+            radius: 0.4,
+            center: Vec2::ZERO,
+    };
 
-    let main_entity = commands.spawn((
+    let _main_entity = commands.spawn((
+        Name::new("obstacle"),
         ObstacleData(obs.to_owned()),
         ShapeBundle {
-            path: GeometryBuilder::build_as(&shape),
-            transform: state_transform(&obs.initial_state).unwrap(),
+            path: rect_path,
+            transform: {
+                let mut t = state_transform(&obs.initial_state).unwrap();
+                t.translation.z = 4.0;
+                t
+            },
 
             ..default()
         },
@@ -352,23 +433,24 @@ fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObstacle)
             130_u8.saturating_sub((time_step as u8).saturating_mul(2)),
             50,
             140,
-            100_u8.saturating_sub((time_step as u8).saturating_mul(4)),
+            100_u8.saturating_sub((time_step as u8)), //.saturating_mul(4)),
         );
 
         commands.spawn((
+            Name::new(format!("trajectory prediction for t={}", time_step)),
             ShapeBundle {
-                path: GeometryBuilder::build_as(&shape),
-                transform: state_transform(st).unwrap(),
+                path: GeometryBuilder::build_as(&simple_marker),
+                transform: state_transform(st)
+                    .unwrap()
+                    .mul_transform(Transform::from_xyz(0.0, 0.0, 0.5 - (time_step as f32 * 1e-7))),
                 ..default()
             },
             Fill::color(ts_color),
-        )).set_parent_in_place(main_entity);
+        )); //.set_parent(main_entity);
     }
 }
 
-fn setup(mut commands: Commands) {
-    let cr = read_cr();
-
+fn setup(mut commands: Commands, cr: Res<CommonRoad>) {
     for obs in &cr.dynamic_obstacles {
         // dbg!(obs);
         spawn_obstacle(&mut commands, obs);
@@ -402,13 +484,17 @@ struct CurrentTimeStep {
     dynamic_time_step: f32,
 }
 
-fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>) {
+fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>, cr: Res<CommonRoad>) {
     let ctx = contexts.ctx_mut();
 
     let panel_id = egui::Id::new("side panel left");
     egui::SidePanel::left(panel_id)
         .exact_width(400.0)
         .show(ctx, |ui| {
+            ui.heading("Scenario Information");
+            ui.label(format!("{:#?}", cr.information));
+
+            ui.heading("Time Control");
             ui.style_mut().spacing.slider_width = 300.0;
             ui.add(
                 egui::Slider::new(&mut cts.time_step, 0..=40)
@@ -418,7 +504,8 @@ fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>) {
             );
 
             ui.add(
-                egui::Slider::new(&mut cts.dynamic_time_step, 0.0..=40.0)
+                egui::Slider::new(&mut cts.dynamic_time_step, 0.0..=140.0)
+                    .smart_aim(false)
                     .text("d time step")
                     .clamp_to_range(true),
             );
@@ -472,7 +559,7 @@ fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
                         .name(format!("velocity [m/s] for {}", obs.dynamic_obstacle_id)); //.shape(Mark);
                     pui.line(line);
 
-                    pui.set_plot_bounds(PlotBounds::from_min_max([1.0, 0.0], [40.0, 20.0]));
+                    // pui.set_plot_bounds(PlotBounds::from_min_max([1.0, 0.0], [40.0, 20.0]));
                 }
             });
     });
