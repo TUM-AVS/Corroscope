@@ -1,9 +1,12 @@
 use bevy::prelude::*;
 
-use bevy_editor_pls::prelude::*;
 use bevy_egui::{EguiContexts, EguiPlugin};
 
+#[cfg(feature = "inspector")]
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+
+#[cfg(feature = "editor")]
+use bevy_editor_pls::prelude::*;
 
 use bevy_prototype_lyon::prelude::*;
 
@@ -79,9 +82,10 @@ fn main() -> color_eyre::eyre::Result<()> {
                 .distributive_run_if(bevy::input::common_conditions::input_just_pressed(KeyCode::F3)),
         );
 
-    // #[cfg(debug)]
-    // app.add_plugin(WorldInspectorPlugin::new());
+    #[cfg(feature = "inspector")]
+    app.add_plugin(WorldInspectorPlugin::new());
 
+    #[cfg(feature = "editor")]
     app.add_plugin(EditorPlugin::default());
 
     app.run();
