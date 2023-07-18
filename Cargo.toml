@@ -10,10 +10,10 @@ edition = "2021"
 [dependencies]
 # nalgebra = "0.32.3"
 bevy = { version = "^0.10.1", default_features = false, features = [
-    "bevy_asset",
+    #"bevy_asset",
     "bevy_core_pipeline",
     "bevy_render",
-    "bevy_scene",
+    #"bevy_scene",
     #"bevy_sprite",
     #"bevy_text",
     #"subpixel_glyph_atlas",
@@ -24,17 +24,23 @@ bevy = { version = "^0.10.1", default_features = false, features = [
     "wayland"
     ] }
 bevy_prototype_lyon = "^0.8.0"
-lyon_algorithms = "^1"
-lyon_path = "^1"
 bevy_egui = { version = "^0.20.3" }
 bevy_pancam = { version = "0.8", features = [ "bevy_egui" ] }
-bevy_mod_picking = { version = "0.14.0", features = [ "backend_egui" ] }
+bevy_mod_picking = { version = "0.14.0", default_features = false, features = [
+    "backend_egui",
+    "backend_raycast",
+    #"highlight",
+    #"selection",
+    ] }
 egui = { version = "0.21.0", features = [
     "mint",
     "extra_debug_asserts"
     ] }
 # emath = "^0.21.0"
 mint = "^0.5.9"
+
+lyon_algorithms = "^1"
+lyon_path = "^1"
 
 color-eyre = "0.5"
 
@@ -57,6 +63,7 @@ prost-build = "0.11.8"
 
 [features]
 default = [ ]
+debug_picking = [ "bevy_mod_picking/debug" ]
 editor = [ "bevy_editor_pls" ]
 inspector = [ "bevy-inspector-egui" ]
 
