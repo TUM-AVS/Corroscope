@@ -138,12 +138,12 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) 
         .left_bound
         .points
         .iter()
-        .map(|p| Into::<Vec2>::into(p));
+        .map(Into::<Vec2>::into);
     let rbound_pts = lanelet
         .right_bound
         .points
         .iter()
-        .map(|p| Into::<Vec2>::into(p));
+        .map(Into::<Vec2>::into);
 
     let mut fpoints: Vec<Vec2> = vec![];
     fpoints.extend(lbound_pts.clone());
