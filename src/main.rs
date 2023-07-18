@@ -31,7 +31,6 @@ impl Resource for CommonRoad {}
 fn main() -> color_eyre::eyre::Result<()> {
     color_eyre::install()?;
 
-
     // let path = "DEU_Muc-2_1_T-1.pb";
     // let path = "../pb_scenarios/ZAM_Tjunction-1_41_T-1.pb";
     let path = "../pb_scenarios/DEU_Muc-4_1_T-1.pb";
@@ -75,19 +74,18 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     app.add_plugins(DefaultPickingPlugins);
 
-
     #[cfg(feature = "debug_picking")]
     {
-        use bevy_mod_picking::debug::DebugPickingMode::{Normal, Disabled};
-        app
-            .insert_resource(State(Disabled))
-            .add_systems(
-                (
-                    (|mut next: ResMut<NextState<_>>| next.set(Normal)).run_if(in_state(Disabled)),
-                    (|mut next: ResMut<NextState<_>>| next.set(Disabled)).run_if(in_state(Normal)),
-                )
-                    .distributive_run_if(bevy::input::common_conditions::input_just_pressed(KeyCode::F3)),
-            );
+        use bevy_mod_picking::debug::DebugPickingMode::{Disabled, Normal};
+        app.insert_resource(State(Disabled)).add_systems(
+            (
+                (|mut next: ResMut<NextState<_>>| next.set(Normal)).run_if(in_state(Disabled)),
+                (|mut next: ResMut<NextState<_>>| next.set(Disabled)).run_if(in_state(Normal)),
+            )
+                .distributive_run_if(
+                    bevy::input::common_conditions::input_just_pressed(KeyCode::F3),
+                ),
+        );
     }
 
     #[cfg(feature = "inspector")]
@@ -100,7 +98,6 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     Ok(())
 }
-
 
 #[derive(Component)]
 pub struct MainCamera;

@@ -31,7 +31,7 @@ fn make_dashed(path: &lyon_path::Path, dash_length: f32, dash_ratio: f32) -> lyo
 
     for i in 0..dash_count {
         let dash_start = i as f32 * dash_length;
-        let dash_end   = i as f32 * dash_length + dash_ratio * dash_length;
+        let dash_end = i as f32 * dash_length + dash_ratio * dash_length;
 
         sampler.split_range(dash_start..dash_end, &mut builder);
     }
@@ -88,20 +88,20 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
     use crate::commonroad_pb::line_marking_enum::LineMarking;
 
     let (path, stroke) = match bound.line_marking() {
-        LineMarking::Solid => { (rb_path, normal_stroke) },
-        LineMarking::BroadSolid => { (rb_path, broad_stroke) },
-        LineMarking::Dashed => { (dashed_path, normal_stroke) },
-        LineMarking::BroadDashed => { (dashed_path, normal_stroke) },
+        LineMarking::Solid => (rb_path, normal_stroke),
+        LineMarking::BroadSolid => (rb_path, broad_stroke),
+        LineMarking::Dashed => (dashed_path, normal_stroke),
+        LineMarking::BroadDashed => (dashed_path, normal_stroke),
         LineMarking::Unknown => {
             bevy::log::info!("lanelet bound has unknown line marking");
 
             (short_dashed_path, light_stroke)
-        },
+        }
         LineMarking::NoMarking => {
             bevy::log::info!("lanelet bound has no line marking");
 
             (short_dashed_path, light_stroke)
-        },
+        }
     };
 
     dbg!(id);
@@ -114,7 +114,6 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
         },
         stroke,
     ))
-
 }
 
 pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
@@ -134,16 +133,8 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) 
         ));
     };
 
-    let lbound_pts = lanelet
-        .left_bound
-        .points
-        .iter()
-        .map(Into::<Vec2>::into);
-    let rbound_pts = lanelet
-        .right_bound
-        .points
-        .iter()
-        .map(Into::<Vec2>::into);
+    let lbound_pts = lanelet.left_bound.points.iter().map(Into::<Vec2>::into);
+    let rbound_pts = lanelet.right_bound.points.iter().map(Into::<Vec2>::into);
 
     let mut fpoints: Vec<Vec2> = vec![];
     fpoints.extend(lbound_pts.clone());
@@ -154,38 +145,34 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) 
         closed: false,
     };
 
-    let main_entity = commands.spawn((
-        Name::new("lanelet"),
-        Lanelet,
-        SpatialBundle::default(),
-    )).id();
+    let main_entity = commands
+        .spawn((Name::new("lanelet"), Lanelet, SpatialBundle::default()))
+        .id();
 
-    commands.spawn((
-        Name::new("background"),
-        LaneletBackground,
-        ShapeBundle {
-            path: GeometryBuilder::build_as(&ll_shape),
-            transform: Transform::from_xyz(0.0, 0.0, 1.0),
-            ..default()
-        },
-        Fill::color(Color::GRAY),
-    )).set_parent_in_place(main_entity);
+    commands
+        .spawn((
+            Name::new("background"),
+            LaneletBackground,
+            ShapeBundle {
+                path: GeometryBuilder::build_as(&ll_shape),
+                transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                ..default()
+            },
+            Fill::color(Color::GRAY),
+        ))
+        .set_parent_in_place(main_entity);
 
     if let Some(bound) = spawn_bound(&lanelet.left_bound, lanelet.lanelet_id) {
-        commands.spawn((
-            Name::new("left bound"),
-            LeftBound,
-            bound,
-        )).set_parent(main_entity);
+        commands
+            .spawn((Name::new("left bound"), LeftBound, bound))
+            .set_parent(main_entity);
     }
     if let Some(bound) = spawn_bound(&lanelet.right_bound, lanelet.lanelet_id) {
-        commands.spawn((
-            Name::new("right bound"),
-            RightBound,
-            bound,
-        )).set_parent(main_entity);
+        commands
+            .spawn((Name::new("right bound"), RightBound, bound))
+            .set_parent(main_entity);
     }
-/*
+    /*
     commands.spawn((
         LeftBound,
         ShapeBundle {

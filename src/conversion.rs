@@ -44,7 +44,6 @@ impl TryFrom<commonroad_pb::state::Position> for egui::Pos2 {
     }
 }
 
-
 impl TryFrom<commonroad_pb::FloatExactOrInterval> for f64 {
     type Error = ();
 

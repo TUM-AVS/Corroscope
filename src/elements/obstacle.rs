@@ -11,15 +11,18 @@ use egui::plot::PlotPoints;
 
 use bevy_mod_picking::prelude::*;
 
-
 fn state_transform(state: &commonroad_pb::State) -> Option<Transform> {
     let position: Vec2 = match state.position.as_ref()? {
         commonroad_pb::state::Position::Point(p) => Vec2::from(p.clone()),
-        _ => { return None; },
+        _ => {
+            return None;
+        }
     };
     let angle = match state.orientation.as_ref()?.exact_or_interval.as_ref()? {
         commonroad_pb::float_exact_or_interval::ExactOrInterval::Exact(e) => *e as f32,
-        _ => { return None; },
+        _ => {
+            return None;
+        }
     };
 
     let mut t = Transform::from_translation(position.extend(1.0));
@@ -56,12 +59,18 @@ pub fn obstacle_tooltip(
             base_id.with(obs.dynamic_obstacle_id),
             // Some(tt_pos),
             |ui| {
-                ui.heading(format!("Obstacle {} (type {:#?})", obs.dynamic_obstacle_id, obs.obstacle_type()));
+                ui.heading(format!(
+                    "Obstacle {} (type {:#?})",
+                    obs.dynamic_obstacle_id,
+                    obs.obstacle_type()
+                ));
                 // ui.label(format!("type: {:#?}", obs.obstacle_type()));
 
-
                 ui.label(format!("signal series: {:#?}", obs.signal_series));
-                ui.label(format!("initial signal state: {:#?}", obs.initial_signal_state));
+                ui.label(format!(
+                    "initial signal state: {:#?}",
+                    obs.initial_signal_state
+                ));
 
                 // ui.label(format!("initial state: {:#?}", obs.initial_state));
             },
@@ -79,37 +88,39 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
     };
     let rect_path: bevy_prototype_lyon::prelude::Path = GeometryBuilder::build_as(&shape);
     let simple_marker = bevy_prototype_lyon::shapes::Circle {
-            radius: 0.4,
-            center: Vec2::ZERO,
+        radius: 0.4,
+        center: Vec2::ZERO,
     };
 
-    let _main_entity = commands.spawn((
-        Name::new("obstacle"),
-        ObstacleData(obs.to_owned()),
-        ShapeBundle {
-            path: rect_path,
-            transform: {
-                let mut t = state_transform(&obs.initial_state).unwrap();
-                t.translation.z = 4.0;
-                t
-            },
+    let _main_entity = commands
+        .spawn((
+            Name::new("obstacle"),
+            ObstacleData(obs.to_owned()),
+            ShapeBundle {
+                path: rect_path,
+                transform: {
+                    let mut t = state_transform(&obs.initial_state).unwrap();
+                    t.translation.z = 4.0;
+                    t
+                },
 
-            ..default()
-        },
-        Fill::color(Color::WHITE),
-        Stroke::new(Color::ORANGE, 0.4),
-        PickableBundle::default(),
-        RaycastPickTarget::default(),
-        On::<Pointer<Down>>::target_commands_mut(|_click, _commands| {
-            bevy::log::info!("clicked obstacle!");
-        }),
-        On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
-            commands.insert(HoveredObstacle);
-        }),
-        On::<Pointer<Out>>::target_commands_mut(|_click, commands| {
-            commands.remove::<HoveredObstacle>();
-        }),
-    )).id();
+                ..default()
+            },
+            Fill::color(Color::WHITE),
+            Stroke::new(Color::ORANGE, 0.4),
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+            On::<Pointer<Down>>::target_commands_mut(|_click, _commands| {
+                bevy::log::info!("clicked obstacle!");
+            }),
+            On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
+                commands.insert(HoveredObstacle);
+            }),
+            On::<Pointer<Out>>::target_commands_mut(|_click, commands| {
+                commands.remove::<HoveredObstacle>();
+            }),
+        ))
+        .id();
 
     let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) = &obs.prediction
         else { return; };
@@ -132,14 +143,17 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
                 path: GeometryBuilder::build_as(&simple_marker),
                 transform: state_transform(st)
                     .unwrap()
-                    .mul_transform(Transform::from_xyz(0.0, 0.0, 0.5 - (time_step as f32 * 1e-7))),
+                    .mul_transform(Transform::from_xyz(
+                        0.0,
+                        0.0,
+                        0.5 - (time_step as f32 * 1e-7),
+                    )),
                 ..default()
             },
             Fill::color(ts_color),
         )); //.set_parent(main_entity);
     }
 }
-
 
 fn velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
     let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) = &obs.prediction.as_ref()?
@@ -158,7 +172,6 @@ fn velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
 
     Some(PlotPoints::new(velocity_pts))
 }
-
 
 fn lerp_states(states: &Vec<commonroad_pb::State>, s: f32) -> Option<Transform> {
     let idx = s.floor() as usize;
