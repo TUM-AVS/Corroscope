@@ -37,7 +37,6 @@ fn main() -> color_eyre::eyre::Result<()> {
     let f = File::open(path).unwrap();
     // let mut f = File::open("USA_Lanker-1_1_T-1.pb").unwrap();
     let cr = read_cr(f);
-    // cr.information.time_step_size
 
     let mut app = App::new();
 
@@ -67,10 +66,16 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_plugin(bevy_pancam::PanCamPlugin::default())
         .add_startup_system(camera_setup)
         .add_startup_system(setup)
+        .add_startup_system(elements::spawn_trajectories)
+        .add_system(elements::highlight_trajectories)
+        .add_system(elements::trajectory_tooltip)
         .add_system(elements::obstacle::plot_obs)
         .add_system(elements::obstacle::obstacle_tooltip)
         .add_system(elements::obstacle::trajectory_animation)
-        .add_system(side_panel);
+        .add_system(side_panel)
+
+        // .add_system(animate_time)
+        ;
 
     app.add_plugins(DefaultPickingPlugins);
 
@@ -145,11 +150,23 @@ pub struct CurrentTimeStep {
     dynamic_time_step: f32,
 }
 
+fn animate_time(
+    time: Res<Time>,
+    mut cts: ResMut<CurrentTimeStep>
+) {
+    cts.dynamic_time_step += time.delta_seconds() * 7.0;
+
+    if cts.dynamic_time_step > 40.0 {
+        cts.dynamic_time_step -= 40.0;
+    }
+}
+
 fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>, cr: Res<CommonRoad>) {
     let ctx = contexts.ctx_mut();
 
     let panel_id = egui::Id::new("side panel left");
     egui::SidePanel::left(panel_id)
+        .resizable(false)
         .exact_width(400.0)
         .show(ctx, |ui| {
             ui.heading("Scenario Information");

@@ -107,7 +107,7 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
                 ..default()
             },
             Fill::color(Color::WHITE),
-            Stroke::new(Color::ORANGE, 0.4),
+            Stroke::new(Color::ORANGE, 0.2),
             PickableBundle::default(),
             RaycastPickTarget::default(),
             On::<Pointer<Down>>::target_commands_mut(|_click, _commands| {
@@ -173,6 +173,35 @@ fn velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
     Some(PlotPoints::new(velocity_pts))
 }
 
+fn numerical_velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
+    let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) = &obs.prediction.as_ref()?
+        else { return None; };
+
+    let velocity_pts = traj
+        .trajectory
+        .states
+        .as_slice()
+        .windows(3)
+        .map(|states| {
+            let prev = &states[0];
+            let this = &states[1];
+            let next = &states[2];
+            let p_prev: Vec2 = prev.position.clone()?.try_into().ok()?;
+            let p_this: Vec2 = this.position.clone()?.try_into().ok()?;
+            let p_next: Vec2 = next.position.clone()?.try_into().ok()?;
+
+            let v1 = p_this.distance(p_prev);
+            let v2 = p_this.distance(p_next);
+            let v = (v1 + v2) as f64 / 2.0;
+
+            let ts: i32 = this.time_step.clone().try_into().ok()?;
+            Some([ts as f64, v])
+        })
+        .collect::<Option<Vec<_>>>()?;
+
+    Some(PlotPoints::new(velocity_pts))
+}
+
 fn lerp_states(states: &Vec<commonroad_pb::State>, s: f32) -> Option<Transform> {
     let idx = s.floor() as usize;
     if (idx + 1) >= states.len() {
@@ -217,8 +246,13 @@ pub fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
                 for obs in &cr.dynamic_obstacles {
                     let pp = velocity_points(obs).unwrap();
                     let line = egui::plot::Line::new(pp)
-                        .name(format!("velocity [m/s] for {}", obs.dynamic_obstacle_id)); //.shape(Mark);
+                        .name(format!("velocity [m/s] for {}", obs.dynamic_obstacle_id));
                     pui.line(line);
+
+                    let npp = numerical_velocity_points(obs).unwrap();
+                    let nline = egui::plot::Line::new(npp)
+                        .name(format!("numerical velocity [m/s] for {}", obs.dynamic_obstacle_id));
+                    pui.line(nline);
 
                     // pui.set_plot_bounds(PlotBounds::from_min_max([1.0, 0.0], [40.0, 20.0]));
                 }
