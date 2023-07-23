@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use bevy_mod_picking::prelude::*;
+
 use bevy_egui::EguiContexts;
 
 use bevy_prototype_lyon::prelude::*;
@@ -109,7 +111,13 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
         center: Vec2::ZERO,
     };
 
-    let _main_entity = commands
+    let main_entity = commands
+        .spawn((
+            Name::new("obstacle group"),
+            SpatialBundle::default(),
+        )).id();
+
+    let _obstacle_entity = commands
         .spawn((
             Name::new("obstacle"),
             ObstacleData(obs.to_owned()),
@@ -136,8 +144,7 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
             On::<Pointer<Out>>::target_commands_mut(|_click, commands| {
                 commands.remove::<HoveredObstacle>();
             }),
-        ))
-        .id();
+        )).set_parent_in_place(main_entity);
 
     let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) = &obs.prediction
         else { return; };
@@ -151,7 +158,7 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
             130_u8.saturating_sub((time_step as u8).saturating_mul(2)),
             50,
             140,
-            100_u8.saturating_sub((time_step as u8)), //.saturating_mul(4)),
+            100_u8.saturating_sub(time_step as u8),
         );
 
         commands.spawn((
@@ -169,7 +176,7 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
                 ..default()
             },
             Fill::color(ts_color),
-        )); //.set_parent(main_entity);
+        )).set_parent(main_entity);
     }
 }
 

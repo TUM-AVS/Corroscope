@@ -45,7 +45,7 @@ pub fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>, 
     let panel_id = egui::Id::new("side panel left");
     egui::SidePanel::left(panel_id)
         .resizable(false)
-        .exact_width(400.0)
+        .exact_width(450.0)
         .show(ctx, |ui| {
             ui.heading("Scenario Information");
             ui.label(format!("{:#?}", cr.information));
