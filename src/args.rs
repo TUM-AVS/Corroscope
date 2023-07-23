@@ -12,4 +12,8 @@ pub struct Args {
     /// Path to the reactive planner logs directory
     #[arg(long)]
     pub logs: std::path::PathBuf,
+
+    /// Path to the reference path file (reference_path.json)
+    #[arg(long)]
+    pub reference_path: std::path::PathBuf,
 }

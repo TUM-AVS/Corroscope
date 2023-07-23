@@ -7,17 +7,17 @@ pub struct RefPath {
     points: Vec<[f64; 2]>,
 }
 
-fn read_ref_path() -> Result<RefPath, Box<dyn std::error::Error>> {
-    let file = std::fs::File::open("../commonroad-reactive-planner/reference_path.json").unwrap();
+fn read_ref_path(path: &std::path::Path) -> Result<RefPath, Box<dyn std::error::Error>> {
+    let file = std::fs::File::open(path).unwrap();
 
     let data = serde_json::from_reader(file).unwrap();
 
     Ok(data)
 }
 
-pub fn spawn_ref_path(mut commands: Commands)
+pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>)
 {
-    let rp = read_ref_path().unwrap();
+    let rp = read_ref_path(&args.reference_path).unwrap();
 
     let points = rp
             .points

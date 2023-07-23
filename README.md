@@ -34,9 +34,12 @@ Steps to build Corroscope:
 
 ## Running Corroscope
 
-Invoke Corroscope specifying the path to the CommonRoad scenario in the Protobuf format
-as well as the logs directory from the Reactive Planner.
+Invoke Corroscope specifying the path to the CommonRoad scenario in the Protobuf format,
+the logs directory and the reference path from the Reactive Planner.
 Example:
 ```
-$ cargo run --release -- --scenario /path/to/ZAM_Tjunction-1_100_T-1.pb --logs /path/to/commonroad-reactive-planner/logs/ZAM_Tjunction-1_100_T-1
+$ cargo run --release -- \
+    --scenario /path/to/ZAM_Tjunction-1_100_T-1.pb \
+    --logs /path/to/commonroad-reactive-planner/logs/ZAM_Tjunction-1_100_T-1 \
+    --reference_path /path/to/commonroad-reactive-planner/reference_path.json
 ```
