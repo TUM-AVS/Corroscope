@@ -361,8 +361,10 @@ pub fn highlight_trajectories(
     settings: Res<crate::global_settings::GlobalSettings>,
     cts: Res<CurrentTimeStep>,
 ) {
+    let time_step = cts.dynamic_time_step.round() as i32;
+
     for (traj, mut visibility) in trajectory_q.iter_mut() {
-        if (traj.feasible || settings.show_infeasible) && traj.time_step == cts.dynamic_time_step.round() as i32 {
+        if (traj.feasible || settings.show_infeasible) && traj.time_step == time_step {
             *visibility = Visibility::Visible;
         } else {
             *visibility = Visibility::Hidden;
@@ -616,6 +618,8 @@ pub fn trajectory_window(
             //    "inf_kin_max_curvature_rate: {}",
             //    traj.inf_kin_max_curvature_rate
             //));
+            
+            plot_traj(&mtraj, traj, ui, cts.dynamic_time_step.round());
 
             return;
 

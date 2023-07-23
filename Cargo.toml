@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # nalgebra = "0.32.3"
-bevy = { version = "^0.10.1", default_features = false, features = [
+bevy = { version = "^0.11.0", default_features = false, features = [
     #"bevy_asset",
     "bevy_core_pipeline",
     "bevy_render",
@@ -18,19 +18,26 @@ bevy = { version = "^0.10.1", default_features = false, features = [
     "wayland",
     "x11"
     ] }
-bevy_prototype_lyon = "^0.8.0"
-bevy_egui = { version = "^0.20.3", default_features = false, features = [ "manage_clipboard" ] }
-bevy_pancam = { version = "0.8", features = [ "bevy_egui" ] }
-bevy_mod_picking = { version = "0.14.0", default_features = false, features = [
-    "backend_egui",
+bevy_prototype_lyon = "^0.9.0"
+bevy_egui = { version = "^0.21.0", default_features = false, features = [ "manage_clipboard" ] }
+bevy_pancam = { version = "0.9", features = [ "bevy_egui" ] }
+bevy_mod_picking = { git = "https://github.com/Vrixyz/bevy_mod_picking", branch = "bevy-0.11-compatibility", default_features = false, features = [
+    #"backend_egui",
     "backend_raycast",
     "highlight",
     "selection",
     ] }
-egui = { version = "0.21.0", features = [
+
+bevy_framepace = "0.13.3"
+
+bevy-inspector-egui = { version = "0.19.0", optional = true }
+bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls.git", branch = "main", optional = true }
+
+egui = { version = "0.22.0", features = [
     "mint",
     "extra_debug_asserts"
     ] }
+
 mint = "^0.5.9"
 
 lyon_algorithms = "^1"
@@ -38,22 +45,22 @@ lyon_path = "^1"
 
 color-eyre = { version = "0.5", default-features = false }
 
-bevy_framepace = "0.12.1"
-
-bevy-inspector-egui = { version = "0.18.3", optional = true }
-bevy_editor_pls = { version = "0.4.0", optional = true }
-
 bytes = "1"
 prost = "0.11.8"
 
-petgraph = "0.6.3"
+# Not yet used
+# petgraph = "0.6.3"
 
 glam = "0.24.1"
 
 csv = "1.2"
 serde = "1.0"
 serde_json = "1.0"
+
 clap = { version = "4.3.19", features = ["derive"] }
+
+[patch.crates-io]
+bevy_mod_raycast = { git = "https://github.com/Vrixyz/bevy_mod_raycast.git", branch = "bevy-0.11-compatibility" }
 
 [build-dependencies]
 prost-build = "0.11.8"
@@ -75,8 +82,10 @@ opt-level = "z"
 [profile.release]
 opt-level = "z"
 lto = true
+strip = true
 #lto = "thin"
 
 [profile.release-with-debuginfo]
 inherits = "release"
 debug = true
+strip = false

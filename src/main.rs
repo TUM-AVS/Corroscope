@@ -62,16 +62,16 @@ fn main() -> color_eyre::eyre::Result<()> {
             ..default()
         }))
         .add_plugins(DefaultPickingPlugins)
-        .add_plugin(LogDiagnosticsPlugin::default())
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        .add_plugin(bevy_framepace::FramepacePlugin)
-        .add_plugin(bevy_egui::EguiPlugin)
-        .add_plugin(ShapePlugin)
-        .add_plugin(bevy_pancam::PanCamPlugin::default())
-        .add_startup_system(camera_setup)
-        .add_system(global_settings::side_panel)
-        .add_plugin(elements::ElementsPlugin)
-        .add_system(global_settings::animate_time)
+        .add_plugins(LogDiagnosticsPlugin::default())
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(bevy_framepace::FramepacePlugin)
+        .add_plugins(bevy_egui::EguiPlugin)
+        .add_plugins(ShapePlugin)
+        .add_plugins(bevy_pancam::PanCamPlugin::default())
+        .add_systems(Startup, camera_setup)
+        .add_systems(Update, global_settings::side_panel)
+        .add_plugins(elements::ElementsPlugin)
+        .add_systems(Update, global_settings::animate_time)
         ;
 
     #[cfg(feature = "debug_picking")]
@@ -89,10 +89,10 @@ fn main() -> color_eyre::eyre::Result<()> {
     }
 
     #[cfg(feature = "inspector")]
-    app.add_plugin(WorldInspectorPlugin::new());
+    app.add_plugins(WorldInspectorPlugin::new());
 
     #[cfg(feature = "editor")]
-    app.add_plugin(EditorPlugin::default());
+    app.add_plugins(EditorPlugin::default());
 
     app.run();
 
