@@ -104,12 +104,10 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
         }
     };
 
-    dbg!(id);
-
     Some((
         ShapeBundle {
             path,
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 2.0 + (id as f32 * 1e-2))),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 1e-1 + (id as f32 * 1e-2))),
             ..default()
         },
         stroke,
@@ -191,4 +189,10 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) 
         Stroke::new(Color::CYAN, 0.1),
     ));
     */
+}
+
+pub fn spawn_lanelets(mut commands: Commands, cr: Res<crate::CommonRoad>) {
+    for lanelet in &cr.lanelets {
+        spawn_lanelet(&mut commands, lanelet);
+    }
 }

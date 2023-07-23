@@ -1,7 +1,5 @@
 use bevy::prelude::*;
 
-use bevy_egui::{EguiContexts, EguiPlugin};
-
 #[cfg(feature = "inspector")]
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
@@ -26,16 +24,20 @@ pub mod commonroad_pb;
 
 pub mod elements;
 
+mod global_settings;
+
+mod args;
+
 impl Resource for CommonRoad {}
 
 fn main() -> color_eyre::eyre::Result<()> {
     color_eyre::install()?;
 
-    // let path = "DEU_Muc-2_1_T-1.pb";
-    // let path = "../pb_scenarios/ZAM_Tjunction-1_41_T-1.pb";
-    let path = "../pb_scenarios/DEU_Muc-4_1_T-1.pb";
-    let f = File::open(path).unwrap();
-    // let mut f = File::open("USA_Lanker-1_1_T-1.pb").unwrap();
+    use clap::Parser;
+    let args = crate::args::Args::parse();
+
+    // TODO: Improve file loading error reporting
+    let f = File::open(&args.scenario).unwrap();
     let cr = read_cr(f);
 
     let mut app = App::new();
@@ -43,7 +45,9 @@ fn main() -> color_eyre::eyre::Result<()> {
     app.insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
         .insert_resource(Msaa::Sample4)
         .insert_resource(cr)
-        .init_resource::<CurrentTimeStep>()
+        .insert_resource(args)
+        .init_resource::<global_settings::GlobalSettings>()
+        .init_resource::<global_settings::CurrentTimeStep>()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Corroscope".into(),
@@ -57,27 +61,18 @@ fn main() -> color_eyre::eyre::Result<()> {
             }),
             ..default()
         }))
-        // .add_plugins(DefaultPickingPlugins)
+        .add_plugins(DefaultPickingPlugins)
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(bevy_framepace::FramepacePlugin)
-        .add_plugin(EguiPlugin)
+        .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(ShapePlugin)
         .add_plugin(bevy_pancam::PanCamPlugin::default())
         .add_startup_system(camera_setup)
-        .add_startup_system(setup)
-        .add_startup_system(elements::spawn_trajectories)
-        .add_system(elements::highlight_trajectories)
-        .add_system(elements::trajectory_tooltip)
-        .add_system(elements::obstacle::plot_obs)
-        .add_system(elements::obstacle::obstacle_tooltip)
-        .add_system(elements::obstacle::trajectory_animation)
-        .add_system(side_panel)
-
-        // .add_system(animate_time)
+        .add_system(global_settings::side_panel)
+        .add_plugin(elements::ElementsPlugin)
+        .add_system(global_settings::animate_time)
         ;
-
-    app.add_plugins(DefaultPickingPlugins);
 
     #[cfg(feature = "debug_picking")]
     {
@@ -134,58 +129,3 @@ fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
     commonroad_pb::CommonRoad::decode(buf).unwrap()
 }
 
-fn setup(mut commands: Commands, cr: Res<CommonRoad>) {
-    for obs in &cr.dynamic_obstacles {
-        // dbg!(obs);
-        elements::obstacle::spawn_obstacle(&mut commands, obs);
-    }
-    for lanelet in &cr.lanelets {
-        elements::lanelet::spawn_lanelet(&mut commands, lanelet);
-    }
-}
-
-#[derive(Default, Resource)]
-pub struct CurrentTimeStep {
-    time_step: i32,
-    dynamic_time_step: f32,
-}
-
-fn animate_time(
-    time: Res<Time>,
-    mut cts: ResMut<CurrentTimeStep>
-) {
-    cts.dynamic_time_step += time.delta_seconds() * 7.0;
-
-    if cts.dynamic_time_step > 40.0 {
-        cts.dynamic_time_step -= 40.0;
-    }
-}
-
-fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>, cr: Res<CommonRoad>) {
-    let ctx = contexts.ctx_mut();
-
-    let panel_id = egui::Id::new("side panel left");
-    egui::SidePanel::left(panel_id)
-        .resizable(false)
-        .exact_width(400.0)
-        .show(ctx, |ui| {
-            ui.heading("Scenario Information");
-            ui.label(format!("{:#?}", cr.information));
-
-            ui.heading("Time Control");
-            ui.style_mut().spacing.slider_width = 300.0;
-            ui.add(
-                egui::Slider::new(&mut cts.time_step, 0..=40)
-                    .text("time step")
-                    .step_by(1.0)
-                    .clamp_to_range(true),
-            );
-
-            ui.add(
-                egui::Slider::new(&mut cts.dynamic_time_step, 0.0..=140.0)
-                    .smart_aim(false)
-                    .text("d time step")
-                    .clamp_to_range(true),
-            );
-        });
-}

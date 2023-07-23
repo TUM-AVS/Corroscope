@@ -78,6 +78,23 @@ pub fn obstacle_tooltip(
     }
 }
 
+/*
+const HIGHLIGHT_TINT: Highlight<Stroke> = Highlight {
+    hovered: Some(HighlightKind::new_dynamic(|stroke| {
+        stroke.color = stroke.color + bevy::math::vec4(-0.2, -0.2, 0.4, 0.0);
+        *stroke
+    })),
+    pressed: Some(HighlightKind::new_dynamic(|stroke| {
+        stroke.color = stroke.color + bevy::math::vec4(-0.3, -0.3, 0.5, 0.0);
+        *stroke
+    })),
+    selected: Some(HighlightKind::new_dynamic(|stroke| {
+        stroke.color = stroke.color + bevy::math::vec4(-0.3, 0.2, -0.3, 0.0);
+        *stroke
+    })),
+};
+*/
+
 pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObstacle) {
     let shape = match obs.shape.shape.as_ref().unwrap() {
         commonroad_pb::shape::Shape::Rectangle(r) => bevy_prototype_lyon::shapes::Rectangle {
@@ -88,7 +105,7 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
     };
     let rect_path: bevy_prototype_lyon::prelude::Path = GeometryBuilder::build_as(&shape);
     let simple_marker = bevy_prototype_lyon::shapes::Circle {
-        radius: 0.4,
+        radius: 0.2 * 1e3,
         center: Vec2::ZERO,
     };
 
@@ -147,7 +164,8 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
                         0.0,
                         0.0,
                         0.5 - (time_step as f32 * 1e-7),
-                    )),
+                    ))
+                    .with_scale(Vec3::splat(1e-3)),
                 ..default()
             },
             Fill::color(ts_color),
@@ -213,6 +231,7 @@ fn lerp_states(states: &Vec<commonroad_pb::State>, s: f32) -> Option<Transform> 
     let mut f1 = state_transform(&states[idx])?;
     let f2 = state_transform(&states[idx + 1])?;
 
+    // Transform::
     f1.translation = f1.translation.lerp(f2.translation, s_idx);
     f1.rotation = f1.rotation.lerp(f2.rotation, s_idx);
 
@@ -221,7 +240,7 @@ fn lerp_states(states: &Vec<commonroad_pb::State>, s: f32) -> Option<Transform> 
 
 pub fn trajectory_animation(
     mut obstacle_q: Query<(&ObstacleData, &mut Transform)>,
-    cts: Res<crate::CurrentTimeStep>,
+    cts: Res<crate::global_settings::CurrentTimeStep>,
 ) {
     for (obs, mut transform) in obstacle_q.iter_mut() {
         let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) = &obs.0.prediction.as_ref().unwrap()
@@ -258,4 +277,10 @@ pub fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
                 }
             });
     });
+}
+
+pub fn spawn_obstacles(mut commands: Commands, cr: Res<crate::CommonRoad>) {
+    for obs in &cr.dynamic_obstacles {
+        spawn_obstacle(&mut commands, obs);
+    }
 }

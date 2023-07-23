@@ -19,7 +19,7 @@ bevy = { version = "^0.10.1", default_features = false, features = [
     "x11"
     ] }
 bevy_prototype_lyon = "^0.8.0"
-bevy_egui = { version = "^0.20.3" }
+bevy_egui = { version = "^0.20.3", default_features = false, features = [ "manage_clipboard" ] }
 bevy_pancam = { version = "0.8", features = [ "bevy_egui" ] }
 bevy_mod_picking = { version = "0.14.0", default_features = false, features = [
     "backend_egui",
@@ -31,16 +31,13 @@ egui = { version = "0.21.0", features = [
     "mint",
     "extra_debug_asserts"
     ] }
-# emath = "^0.21.0"
 mint = "^0.5.9"
 
 lyon_algorithms = "^1"
 lyon_path = "^1"
 
-color-eyre = "0.5"
+color-eyre = { version = "0.5", default-features = false }
 
-#[dev-dependencies]
-rand = "^0.8.5"
 bevy_framepace = "0.12.1"
 
 bevy-inspector-egui = { version = "0.18.3", optional = true }
@@ -55,23 +52,31 @@ glam = "0.24.1"
 
 csv = "1.2"
 serde = "1.0"
+serde_json = "1.0"
+clap = { version = "4.3.19", features = ["derive"] }
 
 [build-dependencies]
 prost-build = "0.11.8"
 
 [features]
-default = [ "dynamic_linking", "editor" ]
-dynamic_linking = [ "bevy/dynamic_linking" ]
-debug_picking = [ "bevy_mod_picking/debug" ]
-editor = [ "bevy_editor_pls" ]
-inspector = [ "bevy-inspector-egui" ]
+default = []
+dynamic_linking = ["bevy/dynamic_linking"]
+debug_picking = ["bevy_mod_picking/debug"]
+editor = ["bevy_editor_pls"]
+inspector = ["bevy-inspector-egui"]
 
 # Enable max optimizations for dependencies, but not for our code:
 [profile.dev.package."*"]
-opt-level = 3
+opt-level = "z"
 
 [profile.dev.package.backtrace]
-opt-level = 3
+opt-level = "z"
 
 [profile.release]
-lto = "thin"
+opt-level = "z"
+lto = true
+#lto = "thin"
+
+[profile.release-with-debuginfo]
+inherits = "release"
+debug = true
