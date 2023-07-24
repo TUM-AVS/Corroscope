@@ -61,6 +61,8 @@ serde_json = "1.0"
 clap = { version = "4.3.19", features = ["derive"] }
 itertools = "0.11.0"
 memmap2 = "0.7.1"
+futures-lite = "1.13.0"
+thingbuf = "0.1.4"
 
 # bevy_picking_egui = { git = "https://github.com/Vrixyz/bevy_mod_picking", branch = "bevy-0.11-compatibility", package = "bevy_picking_egui", default_features = false }
 
@@ -82,16 +84,20 @@ editor = ["bevy_editor_pls"]
 
 # Enable max optimizations for dependencies, but not for our code:
 [profile.dev.package."*"]
-opt-level = "z"
+opt-level = 3
+
+[profile.dev]
+opt-level = 1
+
 
 [profile.dev.package.backtrace]
-opt-level = "z"
+opt-level = 3
 
 [profile.release]
-opt-level = "z"
-lto = true
+# opt-level = "z"
+#lto = true
 strip = true
-#lto = "thin"
+lto = "thin"
 
 [profile.release-with-debuginfo]
 inherits = "release"

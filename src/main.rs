@@ -46,6 +46,7 @@ fn main() -> color_eyre::eyre::Result<()> {
         .insert_resource(Msaa::Sample4)
         .insert_resource(cr)
         .insert_resource(args)
+        .insert_resource(bevy::winit::WinitSettings::desktop_app())
         .init_resource::<global_settings::GlobalSettings>()
         .init_resource::<global_settings::CurrentTimeStep>()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -63,12 +64,12 @@ fn main() -> color_eyre::eyre::Result<()> {
         }))
         .add_plugins(DefaultPickingPlugins)
         .add_plugins(LogDiagnosticsPlugin::default())
-        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(FrameTimeDiagnosticsPlugin)
         .add_plugins(bevy_framepace::FramepacePlugin)
         .add_plugins(bevy_egui::EguiPlugin)
         .add_plugins(ShapePlugin)
-        .add_plugins(bevy_pancam::PanCamPlugin::default())
-        .add_systems(Startup, camera_setup)
+        .add_plugins(bevy_pancam::PanCamPlugin)
+        .add_systems(Startup, (camera_setup, update_ui_scale_factor))
         .add_systems(Update, global_settings::side_panel)
         .add_plugins(elements::ElementsPlugin)
         .add_systems(Update, global_settings::animate_time)
@@ -136,3 +137,11 @@ fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
     commonroad_pb::CommonRoad::decode(buf).unwrap()
 }
 
+use bevy::{prelude::*, window::PrimaryWindow};
+use bevy_egui::EguiSettings;
+
+fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Query<&Window, With<PrimaryWindow>>) {
+    if let Ok(window) = windows.get_single() {
+        egui_settings.scale_factor = 1.0 / window.scale_factor();
+    }
+}
