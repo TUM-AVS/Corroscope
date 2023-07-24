@@ -72,8 +72,7 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_systems(Startup, (camera_setup, update_ui_scale_factor))
         .add_systems(Update, global_settings::side_panel)
         .add_plugins(elements::ElementsPlugin)
-        .add_systems(Update, global_settings::animate_time)
-        ;
+        .add_systems(Update, global_settings::animate_time);
 
     #[cfg(feature = "debug_picking")]
     {
@@ -98,9 +97,10 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     app.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin);
 
-
     #[cfg(feature = "editor")]
-    app.add_plugins(EditorPlugin::on_second_monitor_fullscreen(EditorPlugin::default()));
+    app.add_plugins(EditorPlugin::on_second_monitor_fullscreen(
+        EditorPlugin::default(),
+    ));
 
     app.run();
 
@@ -140,7 +140,10 @@ fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_egui::EguiSettings;
 
-fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Query<&Window, With<PrimaryWindow>>) {
+fn update_ui_scale_factor(
+    mut egui_settings: ResMut<EguiSettings>,
+    windows: Query<&Window, With<PrimaryWindow>>,
+) {
     if let Ok(window) = windows.get_single() {
         egui_settings.scale_factor = 1.0 / window.scale_factor();
     }

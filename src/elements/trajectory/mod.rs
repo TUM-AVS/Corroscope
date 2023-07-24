@@ -29,8 +29,7 @@ where
 
     let s: std::borrow::Cow<'static, str> = serde::Deserialize::deserialize(deserializer)?;
 
-    s
-        .split(',')
+    s.split(',')
         .map(|s| s.parse::<f64>())
         .collect::<Result<Vec<_>, _>>()
         .map_err(D::Error::custom)
@@ -152,7 +151,7 @@ impl TrajectoryLog {
                 170_u8.saturating_sub((self.time_step as u8).saturating_mul(3)),
                 60,
                 90_u8, //.saturating_add(traj.unique_id),
-                40,   //100_u8.saturating_sub((traj.time_step as u8)), //.saturating_mul(4)),
+                40,    //100_u8.saturating_sub((traj.time_step as u8)), //.saturating_mul(4)),
             )
         } else {
             Color::rgba_u8(
@@ -172,11 +171,13 @@ impl TrajectoryLog {
     }
 
     fn acceleration_plot_data(&self) -> Vec<[f64; 2]> {
-        self.kinematic_data.acceleration_plot_data(Some(self.time_step))
+        self.kinematic_data
+            .acceleration_plot_data(Some(self.time_step))
     }
 
     fn orientation_plot_data(&self) -> Vec<[f64; 2]> {
-        self.kinematic_data.orientation_plot_data(Some(self.time_step))
+        self.kinematic_data
+            .orientation_plot_data(Some(self.time_step))
     }
 
     fn kappa_plot_data(&self) -> Vec<[f64; 2]> {
@@ -184,7 +185,8 @@ impl TrajectoryLog {
     }
 
     fn curvilinear_orientation_plot_data(&self) -> Vec<[f64; 2]> {
-        self.kinematic_data.curvilinear_orientation_plot_data(Some(self.time_step))
+        self.kinematic_data
+            .curvilinear_orientation_plot_data(Some(self.time_step))
     }
 }
 
@@ -229,13 +231,8 @@ pub struct MainLog {
 pub fn read_log(path: &std::path::Path) -> Result<Vec<TrajectoryLog>, Box<dyn std::error::Error>> {
     let file = std::fs::File::open(path)?;
 
-    let map = unsafe {
-        memmap2::MmapOptions::new()
-            .populate()
-            .map(&file)?
-    };
+    let map = unsafe { memmap2::MmapOptions::new().populate().map(&file)? };
     let cursor = std::io::Cursor::new(map);
-
 
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b';')
@@ -247,9 +244,7 @@ pub fn read_log(path: &std::path::Path) -> Result<Vec<TrajectoryLog>, Box<dyn st
 }
 
 pub fn read_main_log(path: &std::path::Path) -> Result<Vec<MainLog>, Box<dyn std::error::Error>> {
-    let mut rdr = csv::ReaderBuilder::new()
-        .delimiter(b';')
-        .from_path(path)?;
+    let mut rdr = csv::ReaderBuilder::new().delimiter(b';').from_path(path)?;
 
     let res = rdr.deserialize().collect::<Result<Vec<_>, _>>()?;
 
@@ -268,59 +263,57 @@ pub struct HoveredTrajectory;
 fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
     let x_positions_m = mtraj
         .iter()
-        .map(|traj| {
-            traj.x_position_vehicle_m
-        })
+        .map(|traj| traj.x_position_vehicle_m)
         .collect::<Vec<f64>>();
     let y_positions_m = mtraj
         .iter()
-        .map(|traj| {
-            traj.y_position_vehicle_m
-        })
+        .map(|traj| traj.y_position_vehicle_m)
         .collect::<Vec<f64>>();
 
     let velocities_mps = mtraj
         .iter()
-        .map(|traj| {
-            traj.kinematic_data.velocities_mps.first().copied()
-        })
+        .map(|traj| traj.kinematic_data.velocities_mps.first().copied())
         .collect::<Option<Vec<f64>>>()
         .unwrap();
 
     let accelerations_mps2 = mtraj
         .iter()
-        .map(|traj| {
-            traj.kinematic_data.accelerations_mps2.first().copied()
-        })
+        .map(|traj| traj.kinematic_data.accelerations_mps2.first().copied())
         .collect::<Option<Vec<f64>>>()
         .unwrap();
 
     let theta_orientations_rad = mtraj
         .iter()
-        .map(|traj| {
-            traj.kinematic_data.theta_orientations_rad.first().copied()
-        })
+        .map(|traj| traj.kinematic_data.theta_orientations_rad.first().copied())
         .collect::<Option<Vec<f64>>>()
         .unwrap();
 
     let kappa_rad = mtraj
         .iter()
-        .map(|traj| {
-            traj.kinematic_data.kappa_rad.first().copied()
-        })
+        .map(|traj| traj.kinematic_data.kappa_rad.first().copied())
         .collect::<Option<Vec<f64>>>()
         .unwrap();
-
 
     let curvilinear_orientations_rad = mtraj
         .iter()
         .map(|traj| {
-            traj.kinematic_data.curvilinear_orientations_rad.first().copied()
+            traj.kinematic_data
+                .curvilinear_orientations_rad
+                .first()
+                .copied()
         })
         .collect::<Option<Vec<f64>>>()
         .unwrap();
 
-    KinematicData { x_positions_m, y_positions_m, theta_orientations_rad, kappa_rad, curvilinear_orientations_rad, velocities_mps, accelerations_mps2 }
+    KinematicData {
+        x_positions_m,
+        y_positions_m,
+        theta_orientations_rad,
+        kappa_rad,
+        curvilinear_orientations_rad,
+        velocities_mps,
+        accelerations_mps2,
+    }
 }
 
 #[derive(Default, Component)]
@@ -336,9 +329,7 @@ pub(crate) struct TrajectoryGroup {
 fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
     let points: Vec<Vec2> = traj.kinematic_data.positions().collect();
 
-    if !points
-        .iter()
-        .all(|v| v.x.is_finite() && v.y.is_finite()) {
+    if !points.iter().all(|v| v.x.is_finite() && v.y.is_finite()) {
         return None;
     }
 
@@ -355,10 +346,7 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
             transform: Transform::from_xyz(0.0, 0.0, 4.0 + (traj.unique_id as f32) * 1e-6),
             ..default()
         },
-        Stroke::new(
-            traj.color(),
-            0.05,
-        ),
+        Stroke::new(traj.color(), 0.05),
         On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
             commands.insert(HoveredTrajectory);
         }),
@@ -366,7 +354,6 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
             commands.remove::<HoveredTrajectory>();
         }),
         PickableBundle::default(),
-
         RaycastPickTarget::default(),
     ))
 }
@@ -374,9 +361,7 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
 fn make_main_trajectory_bundle(main_trajectories: &Vec<MainLog>) -> (MainTrajectory, impl Bundle) {
     let mpoints = main_trajectories
         .iter()
-        .map(|traj| {
-            traj.kinematic_data.positions().next()
-        })
+        .map(|traj| traj.kinematic_data.positions().next())
         .collect::<Option<Vec<Vec2>>>()
         .unwrap();
 
@@ -390,46 +375,38 @@ fn make_main_trajectory_bundle(main_trajectories: &Vec<MainLog>) -> (MainTraject
         kinematic_data: reassemble_main_trajectory(&main_trajectories),
     };
 
-
-    (mtraj, (
-        Name::new("main trajectory"),
-        ShapeBundle {
-            path: GeometryBuilder::build_as(&traj_shape),
-            transform: Transform::from_xyz(0.0, 0.0, 0.5),
-            ..default()
-        },
-        Stroke::new(
-            Color::rgba(0.4, 0.6, 0.18, 0.7),
-            0.15,
+    (
+        mtraj,
+        (
+            Name::new("main trajectory"),
+            ShapeBundle {
+                path: GeometryBuilder::build_as(&traj_shape),
+                transform: Transform::from_xyz(0.0, 0.0, 0.5),
+                ..default()
+            },
+            Stroke::new(Color::rgba(0.4, 0.6, 0.18, 0.7), 0.15),
         ),
-    ))
+    )
 }
 
 pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) {
     let main_trajectories_path = std::path::Path::join(&args.logs, "logs.csv");
-    let main_trajectories = read_main_log(&main_trajectories_path).expect("could not read trajectory logs");
+    let main_trajectories =
+        read_main_log(&main_trajectories_path).expect("could not read trajectory logs");
     let (mtraj_res, mtraj_bundle) = make_main_trajectory_bundle(&main_trajectories);
 
     commands.insert_resource(mtraj_res);
 
     commands.spawn(mtraj_bundle);
- 
 
     let trajectories_path = std::path::Path::join(&args.logs, "trajectories.csv");
     // let io_pool = bevy::tasks::AsyncComputeTaskPool::get();
-    let io_pool = bevy::tasks::TaskPoolBuilder::new()
-        .num_threads(8)
-        .build();
+    let io_pool = bevy::tasks::TaskPoolBuilder::new().num_threads(8).build();
 
     let file = std::fs::File::open(trajectories_path).unwrap();
 
-    let map = unsafe {
-        memmap2::MmapOptions::new()
-            .populate()
-            .map(&file)
-    }.unwrap();
+    let map = unsafe { memmap2::MmapOptions::new().populate().map(&file) }.unwrap();
     let cursor = std::io::Cursor::new(map);
-
 
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b';')
@@ -447,25 +424,24 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
     let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     let reader_task = io_pool.spawn({
-    let buf = buf.clone();
-    let done = done.clone();
+        let buf = buf.clone();
+        let done = done.clone();
 
-
-    async move {
-    while !rdr.is_done() {
-        match buf.push_ref() 
-            {
-            Ok(mut bref) => {
-                    rdr.read_record(&mut bref).unwrap();
-            },
-            Err(_) =>         {
-                std::thread::sleep(std::time::Duration::from_micros(100));
-                continue;
-            },
-        };
-    }
-    done.store(true, std::sync::atomic::Ordering::Relaxed);
-    }});
+        async move {
+            while !rdr.is_done() {
+                match buf.push_ref() {
+                    Ok(mut bref) => {
+                        rdr.read_record(&mut bref).unwrap();
+                    }
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_micros(100));
+                        continue;
+                    }
+                };
+            }
+            done.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    });
 
     reader_task.detach();
     for _ in 0..6 {
@@ -475,28 +451,28 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
         let headers = headers.clone();
         let sender = sender.clone();
 
-        let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send>>> = io_pool.spawn({
-            async move {
-                while !done.load(std::sync::atomic::Ordering::Relaxed) {
-                    let Some(next) = buf.pop_ref() else {
+        let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send>>> =
+            io_pool.spawn({
+                async move {
+                    while !done.load(std::sync::atomic::Ordering::Relaxed) {
+                        let Some(next) = buf.pop_ref() else {
                         std::thread::yield_now();
                         continue;
                     };
 
-                    let tl: TrajectoryLog = next.deserialize(Some(&headers)).unwrap(); //map_err(Box::new).map_err(std::sync::Arc::new)?;
-                    if let Some(bundle) = make_trajectory_bundle(&tl) {
-                        sender.send((tl.time_step, bundle)).unwrap();
-                    }
+                        let tl: TrajectoryLog = next.deserialize(Some(&headers)).unwrap(); //map_err(Box::new).map_err(std::sync::Arc::new)?;
+                        if let Some(bundle) = make_trajectory_bundle(&tl) {
+                            sender.send((tl.time_step, bundle)).unwrap();
+                        }
 
-                    // bevy::log::info!("len={}", buf.len());
+                        // bevy::log::info!("len={}", buf.len());
+                    }
+                    drop(sender);
+                    Ok(())
                 }
-                drop(sender);
-                Ok(())
-            }
-        });
+            });
         task.detach();
     }
-    
 
     /*
     while rdr.read_record(&mut sr).unwrap() {
@@ -523,26 +499,25 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
 
     let inserter = io_pool.scope(|s| {
         s.spawn({
-        async move {
-    let mut ts_map = BTreeMap::new();
-    for (ts, bundle) in receiver.iter() {
-        //bevy::log::info!("received one");
-        let ts_entity = ts_map.entry(ts).or_insert_with(|| {
-            commands.spawn((
-                Name::new(format!("trajectory group ts={}", ts)),
-                TrajectoryGroup { time_step: ts },
-                SpatialBundle::default(),
-            )).id()
+            async move {
+                let mut ts_map = BTreeMap::new();
+                for (ts, bundle) in receiver.iter() {
+                    //bevy::log::info!("received one");
+                    let ts_entity = ts_map.entry(ts).or_insert_with(|| {
+                        commands
+                            .spawn((
+                                Name::new(format!("trajectory group ts={}", ts)),
+                                TrajectoryGroup { time_step: ts },
+                                SpatialBundle::default(),
+                            ))
+                            .id()
+                    });
+                    commands.spawn(bundle).set_parent(*ts_entity);
+                }
+                bevy::log::info!("done");
+            }
         });
-        commands.spawn(bundle).set_parent(*ts_entity);
-            }                    bevy::log::info!("done");
-            
-        }
     });
-    });
-   
-
-
 
     // let res = rdr.deserialize().collect::<Result<Vec<_>, _>>()?;
     /*
@@ -572,7 +547,7 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
             commands.spawn(bundle).set_parent(ts_entity);
         }
     }
-    */   
+    */
 }
 
 pub(crate) fn trajectory_group_visibility(
@@ -622,10 +597,10 @@ pub fn trajectory_cursor(
     match pointerts.time_step {
         None => {
             *visibility = Visibility::Hidden;
-        },
+        }
         Some(_ts) => {
             *visibility = Visibility::Visible;
-        },
+        }
     }
 }
 
@@ -638,7 +613,9 @@ pub fn trajectory_tooltip(
 
     let base_id = egui::Id::new("traj tooltip");
 
-    if trajectory_q.is_empty() { return; }
+    if trajectory_q.is_empty() {
+        return;
+    }
 
     egui::containers::show_tooltip(
         ctx,
@@ -667,8 +644,6 @@ pub fn trajectory_tooltip(
                 //    traj.inf_kin_max_curvature_rate
                 //));
                 // plot_traj(traj, ui, cts.dynamic_time_step.round());
-
-
             }
         },
     );
@@ -685,7 +660,6 @@ pub fn update_selected_color(
         }
     }
 }
-
 
 pub fn trajectory_window(
     mut commands: Commands,
@@ -714,97 +688,98 @@ pub fn trajectory_window(
         .exact_width(500.0)
         .show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-            let Some((entity, traj)) = selected_traj else {
+                let Some((entity, traj)) = selected_traj else {
                 *cached_plot_data = None;
                 return;
             };
 
-            let cplot_data = match cached_plot_data.as_ref() {
-                Some(data) => {
-                    if data.time_step == traj.time_step && data.trajectory_number == traj.trajectory_number && data.unique_id == traj.unique_id {
-                        data.clone()
-                    } else {
-                        let cplot_data = plot::CachedTrajectoryPlotData::from_trajectory(&mtraj, traj);
+                let cplot_data = match cached_plot_data.as_ref() {
+                    Some(data) => {
+                        if data.time_step == traj.time_step
+                            && data.trajectory_number == traj.trajectory_number
+                            && data.unique_id == traj.unique_id
+                        {
+                            data.clone()
+                        } else {
+                            let cplot_data =
+                                plot::CachedTrajectoryPlotData::from_trajectory(&mtraj, traj);
+                            *cached_plot_data = Some(cplot_data.clone());
+                            cplot_data
+                        }
+                    }
+                    None => {
+                        let cplot_data =
+                            plot::CachedTrajectoryPlotData::from_trajectory(&mtraj, traj);
                         *cached_plot_data = Some(cplot_data.clone());
                         cplot_data
                     }
-                },
-                None => {
-                    let cplot_data = plot::CachedTrajectoryPlotData::from_trajectory(&mtraj, traj);
-                    *cached_plot_data = Some(cplot_data.clone());
-                    cplot_data
-                },
-            };
+                };
 
-            ui.heading(format!("Trajectory {}", traj.trajectory_number));
-            // ui.label(format!("type: {:#?}", obs.obstacle_type()));
+                ui.heading(format!("Trajectory {}", traj.trajectory_number));
+                // ui.label(format!("type: {:#?}", obs.obstacle_type()));
 
-            ui.label(format!("feasible: {}", traj.feasible));
+                ui.label(format!("feasible: {}", traj.feasible));
 
-            ui.label(format!("total cost: {}", traj.costs_cumulative_weighted));
-            ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
-            ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
-            ui.label(format!(
-                "inf_kin_acceleration: {}",
-                traj.inf_kin_acceleration
-            ));
-            ui.label(format!(
-                "inf_kin_max_curvature: {}",
-                traj.inf_kin_max_curvature
-            ));
-            //ui.label(format!(
-            //    "inf_kin_max_curvature_rate: {}",
-            //    traj.inf_kin_max_curvature_rate
-            //));
+                ui.label(format!("total cost: {}", traj.costs_cumulative_weighted));
+                ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
+                ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
+                ui.label(format!(
+                    "inf_kin_acceleration: {}",
+                    traj.inf_kin_acceleration
+                ));
+                ui.label(format!(
+                    "inf_kin_max_curvature: {}",
+                    traj.inf_kin_max_curvature
+                ));
+                //ui.label(format!(
+                //    "inf_kin_max_curvature_rate: {}",
+                //    traj.inf_kin_max_curvature_rate
+                //));
 
-            let plot_data = plot::TrajectoryPlotData::from_data(cplot_data);
+                let plot_data = plot::TrajectoryPlotData::from_data(cplot_data);
 
-            plot::plot_traj(plot_data, ui, cts.dynamic_time_step.round());
+                plot::plot_traj(plot_data, ui, cts.dynamic_time_step.round());
 
-            return;
+                return;
 
-            commands.entity(entity).despawn_descendants();
-            match plot::plot_traj(plot_data, ui, cts.dynamic_time_step.round()) {
-                None => { },
-                Some(ts) => {
-                    let mut ts = ts.round() as i32;
+                commands.entity(entity).despawn_descendants();
+                match plot::plot_traj(plot_data, ui, cts.dynamic_time_step.round()) {
+                    None => {}
+                    Some(ts) => {
+                        let mut ts = ts.round() as i32;
 
+                        if ts >= traj.time_step {
+                            ts -= traj.time_step;
+                        } else {
+                            return;
+                        }
 
-                    if ts >= traj.time_step {
-                        ts -= traj.time_step;
-                    } else {
-                        return;
-                    }
-
-                    let Some(pos) = traj
+                        let Some(pos) = traj
                         .kinematic_data
                         .positions()
                         .nth(ts as usize)
                         else { return; };
 
-                    let pointer_shape = bevy_prototype_lyon::shapes::Circle {
-                        radius: 1e3,
-                        center: Vec2::ZERO,
-                    };
+                        let pointer_shape = bevy_prototype_lyon::shapes::Circle {
+                            radius: 1e3,
+                            center: Vec2::ZERO,
+                        };
 
-                    commands.entity(entity).with_children(|builder| {
-                        builder.spawn((
-                            Name::new("pointer trajectory"),
-                            PointerTimeStep::default(),
-                            ShapeBundle {
-                                path: GeometryBuilder::build_as(&pointer_shape),
-                                transform: Transform::from_translation(
-                                    pos.extend(100.0)
-                                ).with_scale(Vec3::splat(1e-4)),
-                                ..default()
-                            },
-                            Fill::color(Color::ORANGE_RED.with_a(0.6))
-                        ));
-                    });
-                }
-            };
-
-
+                        commands.entity(entity).with_children(|builder| {
+                            builder.spawn((
+                                Name::new("pointer trajectory"),
+                                PointerTimeStep::default(),
+                                ShapeBundle {
+                                    path: GeometryBuilder::build_as(&pointer_shape),
+                                    transform: Transform::from_translation(pos.extend(100.0))
+                                        .with_scale(Vec3::splat(1e-4)),
+                                    ..default()
+                                },
+                                Fill::color(Color::ORANGE_RED.with_a(0.6)),
+                            ));
+                        });
+                    }
+                };
             });
         });
 }

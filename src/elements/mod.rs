@@ -9,8 +9,7 @@ pub struct ElementsPlugin;
 
 impl Plugin for ElementsPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(Startup, obstacle::spawn_obstacles)
+        app.add_systems(Startup, obstacle::spawn_obstacles)
             .add_systems(Startup, lanelet::spawn_lanelets)
             .add_systems(Startup, trajectory::spawn_trajectories)
             .add_systems(Startup, ref_path::spawn_ref_path)
@@ -23,8 +22,7 @@ impl Plugin for ElementsPlugin {
             .add_systems(Update, obstacle::obstacle_tooltip)
             .add_systems(Update, obstacle::trajectory_animation);
 
-        app
-            .register_type::<trajectory::TrajectoryLog>()
+        app.register_type::<trajectory::TrajectoryLog>()
             .register_type::<trajectory::MainLog>()
             .register_type::<trajectory::TrajectoryGroup>();
     }

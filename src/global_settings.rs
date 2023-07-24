@@ -28,9 +28,11 @@ pub struct CurrentTimeStep {
 pub fn animate_time(
     time: Res<Time>,
     mut cts: ResMut<CurrentTimeStep>,
-    settings: Res<GlobalSettings>
+    settings: Res<GlobalSettings>,
 ) {
-    if !settings.enable_time_animation { return; }
+    if !settings.enable_time_animation {
+        return;
+    }
 
     cts.dynamic_time_step += time.delta_seconds() * settings.time_animation_speed;
 
@@ -39,7 +41,12 @@ pub fn animate_time(
     }
 }
 
-pub fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>, mut settings: ResMut<GlobalSettings>, cr: Res<crate::CommonRoad>) {
+pub fn side_panel(
+    mut contexts: EguiContexts,
+    mut cts: ResMut<CurrentTimeStep>,
+    mut settings: ResMut<GlobalSettings>,
+    cr: Res<crate::CommonRoad>,
+) {
     let ctx = contexts.ctx_mut();
 
     let panel_id = egui::Id::new("side panel left");
@@ -51,10 +58,16 @@ pub fn side_panel(mut contexts: EguiContexts, mut cts: ResMut<CurrentTimeStep>, 
             ui.label(format!("{:#?}", cr.information));
 
             ui.heading("Display Settings");
-            ui.checkbox(&mut settings.show_infeasible, "Show infeasible trajectories");
+            ui.checkbox(
+                &mut settings.show_infeasible,
+                "Show infeasible trajectories",
+            );
 
             ui.heading("Time Control");
-            ui.checkbox(&mut settings.enable_time_animation, "Enable time progression");
+            ui.checkbox(
+                &mut settings.enable_time_animation,
+                "Enable time progression",
+            );
 
             ui.style_mut().spacing.slider_width = 300.0;
             ui.add(

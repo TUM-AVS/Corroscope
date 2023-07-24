@@ -112,10 +112,8 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
     };
 
     let main_entity = commands
-        .spawn((
-            Name::new("obstacle group"),
-            SpatialBundle::default(),
-        )).id();
+        .spawn((Name::new("obstacle group"), SpatialBundle::default()))
+        .id();
 
     let _obstacle_entity = commands
         .spawn((
@@ -144,7 +142,8 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
             On::<Pointer<Out>>::target_commands_mut(|_click, commands| {
                 commands.remove::<HoveredObstacle>();
             }),
-        )).set_parent_in_place(main_entity);
+        ))
+        .set_parent_in_place(main_entity);
 
     let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) = &obs.prediction
         else { return; };
@@ -161,22 +160,24 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
             100_u8.saturating_sub(time_step as u8),
         );
 
-        commands.spawn((
-            Name::new(format!("trajectory prediction for t={}", time_step)),
-            ShapeBundle {
-                path: GeometryBuilder::build_as(&simple_marker),
-                transform: state_transform(st)
-                    .unwrap()
-                    .mul_transform(Transform::from_xyz(
-                        0.0,
-                        0.0,
-                        0.5 - (time_step as f32 * 1e-7),
-                    ))
-                    .with_scale(Vec3::splat(1e-3)),
-                ..default()
-            },
-            Fill::color(ts_color),
-        )).set_parent(main_entity);
+        commands
+            .spawn((
+                Name::new(format!("trajectory prediction for t={}", time_step)),
+                ShapeBundle {
+                    path: GeometryBuilder::build_as(&simple_marker),
+                    transform: state_transform(st)
+                        .unwrap()
+                        .mul_transform(Transform::from_xyz(
+                            0.0,
+                            0.0,
+                            0.5 - (time_step as f32 * 1e-7),
+                        ))
+                        .with_scale(Vec3::splat(1e-3)),
+                    ..default()
+                },
+                Fill::color(ts_color),
+            ))
+            .set_parent(main_entity);
     }
 }
 
@@ -276,8 +277,10 @@ pub fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
                     pui.line(line);
 
                     let npp = numerical_velocity_points(obs).unwrap();
-                    let nline = egui::plot::Line::new(npp)
-                        .name(format!("numerical velocity [m/s] for {}", obs.dynamic_obstacle_id));
+                    let nline = egui::plot::Line::new(npp).name(format!(
+                        "numerical velocity [m/s] for {}",
+                        obs.dynamic_obstacle_id
+                    ));
                     pui.line(nline);
 
                     // pui.set_plot_bounds(PlotBounds::from_min_max([1.0, 0.0], [40.0, 20.0]));

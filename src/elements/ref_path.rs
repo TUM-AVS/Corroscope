@@ -15,15 +15,14 @@ fn read_ref_path(path: &std::path::Path) -> Result<RefPath, Box<dyn std::error::
     Ok(data)
 }
 
-pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>)
-{
+pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>) {
     let rp = read_ref_path(&args.reference_path).unwrap();
 
     let points = rp
-            .points
-            .iter()
-            .map(|pt| Vec2::new(pt[0] as f32, pt[1] as f32))
-            .collect();
+        .points
+        .iter()
+        .map(|pt| Vec2::new(pt[0] as f32, pt[1] as f32))
+        .collect();
 
     let reference_path_shape: shapes::Polygon = bevy_prototype_lyon::shapes::Polygon {
         points,
@@ -42,9 +41,6 @@ pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>)
             transform: Transform::from_xyz(0.0, 0.0, 1e-3),
             ..default()
         },
-        Stroke::new(
-            reference_path_color,
-            0.1,
-        ),
+        Stroke::new(reference_path_color, 0.1),
     ));
 }

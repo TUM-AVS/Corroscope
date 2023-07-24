@@ -38,9 +38,11 @@ pub struct CachedTrajectoryPlotData {
     kappa_ref: Vec<[f64; 2]>,
 }
 
-
 impl CachedTrajectoryPlotData {
-    pub(crate) fn from_trajectory(mtraj: &super::MainTrajectory, traj: &super::TrajectoryLog) -> Self {
+    pub(crate) fn from_trajectory(
+        mtraj: &super::MainTrajectory,
+        traj: &super::TrajectoryLog,
+    ) -> Self {
         let velocity = traj.velocity_plot_data();
         let velocity_ref = mtraj.kinematic_data.velocity_plot_data(None);
 
@@ -51,7 +53,8 @@ impl CachedTrajectoryPlotData {
         let orientation_ref = mtraj.kinematic_data.orientation_plot_data(None);
 
         let curvilinear_orientation = traj.curvilinear_orientation_plot_data();
-        let curvilinear_orientation_ref = mtraj.kinematic_data.curvilinear_orientation_plot_data(None);
+        let curvilinear_orientation_ref =
+            mtraj.kinematic_data.curvilinear_orientation_plot_data(None);
 
         let kappa = traj.kappa_plot_data();
         let kappa_ref = mtraj.kinematic_data.kappa_plot_data(None);
@@ -76,35 +79,30 @@ impl CachedTrajectoryPlotData {
 
 impl TrajectoryPlotData {
     pub(crate) fn from_data(plot_data: CachedTrajectoryPlotData) -> Self {
-        let velocity = egui::plot::Line::new(plot_data.velocity)
-            .name("velocity");
+        let velocity = egui::plot::Line::new(plot_data.velocity).name("velocity");
 
-        let velocity_ref = egui::plot::Line::new(plot_data.velocity_ref)
-            .name("ref velocity");
+        let velocity_ref = egui::plot::Line::new(plot_data.velocity_ref).name("ref velocity");
 
-        let acceleration = egui::plot::Line::new(plot_data.acceleration)
-            .name("acceleration");
+        let acceleration = egui::plot::Line::new(plot_data.acceleration).name("acceleration");
 
-        let acceleration_ref = egui::plot::Line::new(plot_data.acceleration_ref)
-            .name("ref acceleration");
+        let acceleration_ref =
+            egui::plot::Line::new(plot_data.acceleration_ref).name("ref acceleration");
 
-        let orientation = egui::plot::Line::new(plot_data.orientation)
-            .name("orientation [rad]");
+        let orientation = egui::plot::Line::new(plot_data.orientation).name("orientation [rad]");
 
         let orientation_ref = egui::plot::Line::new(plot_data.orientation_ref)
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
             .name("reference orientation [rad]");
 
-        let curvilinear_orientation = egui::plot::Line::new(plot_data.curvilinear_orientation)
-            .name("orientation [rad]");
+        let curvilinear_orientation =
+            egui::plot::Line::new(plot_data.curvilinear_orientation).name("orientation [rad]");
 
-        let curvilinear_orientation_ref = egui::plot::Line::new(plot_data.curvilinear_orientation_ref)
-            .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
-            .name("reference orientation [rad]");
+        let curvilinear_orientation_ref =
+            egui::plot::Line::new(plot_data.curvilinear_orientation_ref)
+                .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
+                .name("reference orientation [rad]");
 
-
-        let kappa = egui::plot::Line::new(plot_data.kappa)
-            .name("orientation [rad]");
+        let kappa = egui::plot::Line::new(plot_data.kappa).name("orientation [rad]");
 
         let kappa_ref = egui::plot::Line::new(plot_data.kappa_ref)
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
@@ -125,7 +123,11 @@ impl TrajectoryPlotData {
     }
 }
 
-pub(crate) fn plot_traj(plot_data: TrajectoryPlotData, ui: &mut egui::Ui, time_step: f32) -> Option<f64> {
+pub(crate) fn plot_traj(
+    plot_data: TrajectoryPlotData,
+    ui: &mut egui::Ui,
+    time_step: f32,
+) -> Option<f64> {
     let mut cursor_x = None;
 
     let group = egui::Id::new("trajectory plot group");
@@ -158,7 +160,9 @@ pub(crate) fn plot_traj(plot_data: TrajectoryPlotData, ui: &mut egui::Ui, time_s
 
     ui.heading("Velocity");
     let _velocity_plot = plot("velocity_plot")
-        .y_grid_spacer(egui::plot::uniform_grid_spacer(|_grid_input| { [10.0, 2.0, 0.5] }))
+        .y_grid_spacer(egui::plot::uniform_grid_spacer(|_grid_input| {
+            [10.0, 2.0, 0.5]
+        }))
         .label_formatter(unit_label_formatter("m/s"))
         .show(ui, |pui| {
             pui.line(plot_data.velocity);
@@ -168,7 +172,9 @@ pub(crate) fn plot_traj(plot_data: TrajectoryPlotData, ui: &mut egui::Ui, time_s
 
             // TODO: Pass from vehicle parameters
             let v_max = 36;
-            pui.hline(egui::plot::HLine::new(v_max).style(egui::plot::LineStyle::Dashed { length: 10.0 })); // .name("v_max"));
+            pui.hline(
+                egui::plot::HLine::new(v_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+            ); // .name("v_max"));
 
             if let Some(pointer) = pui.pointer_coordinate() {
                 cursor_x = Some(pointer.x);
@@ -187,8 +193,13 @@ pub(crate) fn plot_traj(plot_data: TrajectoryPlotData, ui: &mut egui::Ui, time_s
 
             // TODO: Pass from vehicle parameters
             let a_max = 2.5;
-            pui.hline(egui::plot::HLine::new(a_max).style(egui::plot::LineStyle::Dashed { length: 10.0 })); //.name("maximum acceleration"));
-            pui.hline(egui::plot::HLine::new(-a_max).style(egui::plot::LineStyle::Dashed { length: 10.0 })); //.name("minimum acceleration"));
+            pui.hline(
+                egui::plot::HLine::new(a_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+            ); //.name("maximum acceleration"));
+            pui.hline(
+                egui::plot::HLine::new(-a_max)
+                    .style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+            ); //.name("minimum acceleration"));
 
             if let Some(pointer) = pui.pointer_coordinate() {
                 cursor_x = Some(pointer.x);
@@ -249,8 +260,14 @@ pub(crate) fn plot_traj(plot_data: TrajectoryPlotData, ui: &mut egui::Ui, time_s
             let delta_max = 0.610865;
             let kappa_max = f64::tan(delta_max) / wheelbase;
 
-            pui.hline(egui::plot::HLine::new(kappa_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }));
-            pui.hline(egui::plot::HLine::new(-kappa_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }));
+            pui.hline(
+                egui::plot::HLine::new(kappa_max)
+                    .style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+            );
+            pui.hline(
+                egui::plot::HLine::new(-kappa_max)
+                    .style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+            );
 
             if let Some(pointer) = pui.pointer_coordinate() {
                 cursor_x = Some(pointer.x);
