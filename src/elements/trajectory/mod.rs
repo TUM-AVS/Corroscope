@@ -338,6 +338,9 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
         closed: false,
     };
 
+    let selected_color = traj.selected_color();
+    let normal_color = traj.color();
+
     Some((
         Name::new(format!("trajectory {}", traj.trajectory_number)),
         traj.to_owned(),
@@ -347,6 +350,10 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
             ..default()
         },
         Stroke::new(traj.color(), 0.05),
+
+        On::<Pointer<Select>>::target_insert(Stroke::new(selected_color, 0.05)),
+        On::<Pointer<Deselect>>::target_insert(Stroke::new(normal_color, 0.05)),
+
         On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
             commands.insert(HoveredTrajectory);
         }),
@@ -358,7 +365,8 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
     ))
 }
 
-fn make_main_trajectory_bundle(main_trajectories: &Vec<MainLog>) -> (MainTrajectory, impl Bundle) {
+
+fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory, impl Bundle) {
     let mpoints = main_trajectories
         .iter()
         .map(|traj| traj.kinematic_data.positions().next())
