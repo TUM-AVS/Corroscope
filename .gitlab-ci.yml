@@ -16,7 +16,8 @@ default:
   tags:
     - cpp
   before_script:
-    - apt-get update && apt-get install -y protobuf-compiler
+    - apt-get update && apt-get install -y protobuf-compiler lld
+    - mv .cargo/ci-config.toml .cargo/config.toml
 
 image: rust:latest
 
