@@ -60,7 +60,8 @@ fn main() -> color_eyre::eyre::Result<()> {
                 prevent_default_event_handling: false,
                 ..default()
             }),
-            ..default()
+            exit_condition: bevy::window::ExitCondition::OnPrimaryClosed,
+            close_when_requested: true,
         }))
         .add_plugins(DefaultPickingPlugins)
         .add_plugins(LogDiagnosticsPlugin::default())
