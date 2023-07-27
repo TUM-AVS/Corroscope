@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use bevy_egui::EguiContexts;
 
-#[derive(Resource)]
+#[derive(Resource, Clone, PartialEq)]
 pub struct GlobalSettings {
     pub show_infeasible: bool,
     pub enable_time_animation: bool,
@@ -55,8 +55,7 @@ pub fn side_panel(
 ) {
     let ctx = contexts.ctx_mut();
 
-    let mut show_infeasible = settings.show_infeasible;
-    let mut enable_time_animation = settings.enable_time_animation;
+    let mut new_settings = settings.to_owned();
 
     let panel_id = egui::Id::new("side panel left");
     egui::SidePanel::left(panel_id)
@@ -67,10 +66,10 @@ pub fn side_panel(
             ui.label(format!("{:#?}", cr.information));
 
             ui.heading("Display Settings");
-            ui.checkbox(&mut show_infeasible, "Show infeasible trajectories");
+            ui.checkbox(&mut new_settings.show_infeasible, "Show infeasible trajectories");
 
             ui.heading("Time Control");
-            ui.checkbox(&mut enable_time_animation, "Enable time progression");
+            ui.checkbox(&mut new_settings.enable_time_animation, "Enable time progression");
 
             ui.style_mut().spacing.slider_width = 300.0;
             let range = cts.prediction_range.clone();
@@ -81,18 +80,16 @@ pub fn side_panel(
                     .clamp_to_range(true),
             );
             ui.add(
-                egui::Slider::new(&mut settings.time_animation_speed, 0.1..=100.0)
+                egui::Slider::new(&mut new_settings.time_animation_speed, 0.1..=100.0)
                     .logarithmic(true)
                     .text("speed")
                     .clamp_to_range(true),
             );
         });
 
-    if show_infeasible != settings.show_infeasible {
-        settings.show_infeasible = show_infeasible;
-    }
-    if enable_time_animation != settings.enable_time_animation {
-        settings.enable_time_animation = enable_time_animation;
+    if *settings != new_settings {
+        bevy::log::debug!("updating GlobalSettings");
+        *settings = new_settings;
     }
 
     let new_ts = cts.dynamic_time_step.round() as i32;
