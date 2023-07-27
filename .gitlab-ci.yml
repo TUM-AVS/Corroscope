@@ -24,19 +24,19 @@ image: rust:latest
 rust-latest:
   stage: build
   script:
-    - cargo build
+    - cargo --color always --locked build
 
 rust-nightly:
   stage: build
   image: rustlang/rust:nightly
   script:
-    - cargo build
+    - cargo --color always --locked build
   allow_failure: true
 
 rust-latest-release:
   stage: build
   script:
-    - cargo build --release
+    - cargo --color always --locked build --release
   artifacts:
     untracked: false
     when: on_success
@@ -49,9 +49,9 @@ clippy:
   script:
     - rustup component add clippy
     - cargo install gitlab_clippy
-    - cargo clippy
+    - cargo --color always --locked clippy
   after_script:
-    - cargo clippy --message-format=json | $CARGO_HOME/bin/gitlab-clippy > gl-code-quality-report.json
+    - cargo --color always --locked clippy --message-format=json | $CARGO_HOME/bin/gitlab-clippy > gl-code-quality-report.json
   artifacts:
     reports:
       codequality: gl-code-quality-report.json
