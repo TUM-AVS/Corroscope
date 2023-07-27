@@ -46,13 +46,12 @@ rust-latest-release:
 
 clippy:
   stage: lint
-  before_script:
+  script:
     - rustup component add clippy
     - cargo install gitlab_clippy
-  script:
     - cargo clippy
   after_script:
-    - cargo clippy --message-format=json | gitlab-clippy > gl-code-quality-report.json
+    - cargo clippy --message-format=json | $CARGO_HOME/bin/gitlab-clippy > gl-code-quality-report.json
   artifacts:
     reports:
       codequality: gl-code-quality-report.json
