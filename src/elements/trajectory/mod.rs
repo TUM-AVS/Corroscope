@@ -553,13 +553,13 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
 pub(crate) fn trajectory_group_visibility(
     mut trajectory_q: Query<(&TrajectoryGroup, &mut Visibility)>,
 
-    cts: Res<CurrentTimeStep>,
+    time_step: Res<crate::global_settings::TimeStep>,
 ) {
-    let time_step = cts.dynamic_time_step.round() as i32;
-
-    if !cts.is_changed() {
+    if !time_step.is_changed() {
         return;
     }
+    let time_step = time_step.time_step;
+    bevy::log::info!("updating group visibility");
 
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.time_step == time_step {
@@ -578,6 +578,8 @@ pub fn trajectory_visibility(
     if !settings.is_changed() {
         return;
     }
+
+    bevy::log::info!("updating traj visibility");
 
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.feasible || settings.show_infeasible {
@@ -647,18 +649,6 @@ pub fn trajectory_tooltip(
             }
         },
     );
-}
-
-pub fn update_selected_color(
-    mut trajectory_q: Query<(&TrajectoryLog, &PickSelection, &mut Stroke), Changed<PickSelection>>,
-) {
-    for (traj, selected, mut stroke) in trajectory_q.iter_mut() {
-        if selected.is_selected {
-            stroke.color = traj.selected_color();
-        } else {
-            stroke.color = traj.color();
-        }
-    }
 }
 
 pub fn trajectory_window(

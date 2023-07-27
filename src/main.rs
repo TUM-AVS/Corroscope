@@ -48,7 +48,7 @@ fn main() -> color_eyre::eyre::Result<()> {
         .insert_resource(args)
         .insert_resource(bevy::winit::WinitSettings::desktop_app())
         .init_resource::<global_settings::GlobalSettings>()
-        .init_resource::<global_settings::CurrentTimeStep>()
+        .init_resource::<global_settings::TimeStep>()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Corroscope".into(),

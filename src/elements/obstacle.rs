@@ -97,7 +97,19 @@ const HIGHLIGHT_TINT: Highlight<Stroke> = Highlight {
 };
 */
 
-pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObstacle) {
+impl commonroad_pb::State {
+    fn time_step(&self) -> Option<i32> {
+        match self.time_step.exact_or_interval {
+            Some(integer_exact_or_interval::ExactOrInterval::Exact(i)) => Some(i),
+            _ => None,
+        }
+    }
+}
+
+pub fn spawn_obstacle(
+    commands: &mut Commands,
+    obs: &commonroad_pb::DynamicObstacle,
+) -> Option<i32> {
     let shape = match obs.shape.shape.as_ref().unwrap() {
         commonroad_pb::shape::Shape::Rectangle(r) => bevy_prototype_lyon::shapes::Rectangle {
             extents: Vec2::new(r.length as f32, r.width as f32),
@@ -146,7 +158,14 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
         .set_parent_in_place(main_entity);
 
     let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) = &obs.prediction
-        else { return; };
+        else { return None; };
+
+    let max_ts = traj
+        .trajectory
+        .states
+        .iter()
+        .map(|s: &commonroad_pb::State| s.time_step().unwrap())
+        .max();
 
     for st in &traj.trajectory.states {
         let time_step = match st.time_step.exact_or_interval {
@@ -179,6 +198,8 @@ pub fn spawn_obstacle(commands: &mut Commands, obs: &commonroad_pb::DynamicObsta
             ))
             .set_parent(main_entity);
     }
+
+    return max_ts;
 }
 
 fn velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
@@ -290,7 +311,16 @@ pub fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
 }
 
 pub fn spawn_obstacles(mut commands: Commands, cr: Res<crate::CommonRoad>) {
+    let mut max_ts = i32::MIN;
+
     for obs in &cr.dynamic_obstacles {
-        spawn_obstacle(&mut commands, obs);
+        if let Some(obs_max_ts) = spawn_obstacle(&mut commands, obs) {
+            max_ts = max_ts.max(obs_max_ts);
+        }
     }
+
+    commands.insert_resource(crate::global_settings::CurrentTimeStep {
+        dynamic_time_step: 0.0,
+        prediction_range: 0.0..=(max_ts as f32),
+    });
 }
