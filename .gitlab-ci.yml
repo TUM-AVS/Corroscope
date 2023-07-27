@@ -41,6 +41,8 @@ rust-latest-release:
     untracked: false
     when: on_success
     expire_in: 30 days
+    name: "corroscope-bin"
+    expose_as: "Built Executable"
     paths:
       - target/release/corroscope
 
