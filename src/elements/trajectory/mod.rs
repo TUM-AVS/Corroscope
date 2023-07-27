@@ -372,7 +372,7 @@ fn make_main_trajectory_bundle(main_trajectories: &Vec<MainLog>) -> (MainTraject
 
     let mtraj = MainTrajectory {
         path: mpoints,
-        kinematic_data: reassemble_main_trajectory(&main_trajectories),
+        kinematic_data: reassemble_main_trajectory(main_trajectories),
     };
 
     (
