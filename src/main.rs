@@ -6,8 +6,6 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 #[cfg(feature = "editor")]
 use bevy_editor_pls::prelude::*;
 
-use bevy_prototype_lyon::prelude::*;
-
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 
 use commonroad_pb::CommonRoad;
@@ -68,7 +66,7 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_plugins(FrameTimeDiagnosticsPlugin)
         .add_plugins(bevy_framepace::FramepacePlugin)
         .add_plugins(bevy_egui::EguiPlugin)
-        .add_plugins(ShapePlugin)
+        .add_plugins(bevy_prototype_lyon::prelude::ShapePlugin)
         .add_plugins(bevy_pancam::PanCamPlugin)
         .add_systems(Startup, (camera_setup, update_ui_scale_factor))
         .add_systems(Update, global_settings::side_panel)
@@ -102,6 +100,16 @@ fn main() -> color_eyre::eyre::Result<()> {
     app.add_plugins(EditorPlugin::on_second_monitor_fullscreen(
         EditorPlugin::default(),
     ));
+
+    #[cfg(feature = "export_schedule")]
+    {
+        use std::io::Write;
+
+        let settings = bevy_mod_debugdump::render_graph::Settings::default();
+        let dot = bevy_mod_debugdump::render_graph_dot(&mut app, &settings);
+        let mut dot_file = std::fs::File::create("bevy_schedule.dot").unwrap();
+        dot_file.write_all(dot.as_bytes()).unwrap();
+    }
 
     app.run();
 
