@@ -65,6 +65,7 @@ itertools = "0.11.0"
 memmap2 = "0.7.1"
 futures-lite = "1.13.0"
 thingbuf = "0.1.4"
+egui_extras = "0.22.0"
 
 # bevy_picking_egui = { git = "https://github.com/Vrixyz/bevy_mod_picking", branch = "bevy-0.11-compatibility", package = "bevy_picking_egui", default_features = false }
 

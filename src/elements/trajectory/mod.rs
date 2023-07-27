@@ -136,7 +136,7 @@ pub struct TrajectoryLog {
     costs_cumulative_weighted: f64,
 
     #[serde(flatten)]
-    costs: Costs,
+    costs: std::collections::HashMap<String, f64>,
 
     inf_kin_yaw_rate: f64,
     inf_kin_acceleration: f64,
@@ -639,7 +639,7 @@ pub fn trajectory_tooltip(
                 ui.label(format!("feasible: {}", traj.feasible));
 
                 ui.label(format!("total cost: {}", traj.costs_cumulative_weighted));
-                ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
+                // ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
                 ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
                 ui.label(format!(
                     "inf_kin_acceleration: {}",
@@ -719,7 +719,38 @@ pub fn trajectory_window(
                 ui.label(format!("feasible: {}", traj.feasible));
 
                 ui.label(format!("total cost: {}", traj.costs_cumulative_weighted));
-                ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
+                // ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
+
+                use egui_extras::{TableBuilder, Column};
+                TableBuilder::new(ui)
+                    .cell_layout(egui::Layout {
+                        main_align: egui::Align::Max,
+                        ..default()
+                    })
+                    .striped(true)
+                    .column(Column::initial(150.0).resizable(true))
+                    .column(Column::initial(50.0))
+                    .header(20.0, |mut header| {
+                        header.col(|ui| {
+                            ui.heading("Cost type");
+                        });
+                        header.col(|ui| {
+                            ui.heading("Value");
+                        });
+                    })
+                    .body(|mut body| {
+                        for (k, v) in traj.costs.iter() {
+                            body.row(30.0, |mut row| {
+                                row.col(|ui| {
+                                    ui.label(k);
+                                });
+                                row.col(|ui| {
+                                    ui.label(format!("{:.2}", v));
+                                });
+                            });
+                        }
+                    });
+
                 ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
                 ui.label(format!(
                     "inf_kin_acceleration: {}",
