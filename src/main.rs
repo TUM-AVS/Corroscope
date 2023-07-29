@@ -1,8 +1,5 @@
 use bevy::prelude::*;
 
-// #[cfg(feature = "inspector")]
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
-
 #[cfg(feature = "editor")]
 use bevy_editor_pls::prelude::*;
 
@@ -96,10 +93,13 @@ fn main() -> color_eyre::eyre::Result<()> {
     //     .register_type::<bevy_prototype_lyon::draw::Stroke>()
     //     .register_type::<bevy_prototype_lyon::draw::Fill>();
 
-    // #[cfg(feature = "inspector")]
-    // app.add_plugins(WorldInspectorPlugin::new());
+    #[cfg(feature = "inspector")]
+    {
+        use bevy_inspector_egui::quick::WorldInspectorPlugin;
+        app.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin);
 
-    app.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin);
+        // app.add_plugins(WorldInspectorPlugin::new());
+    }
 
     #[cfg(feature = "editor")]
     app.add_plugins(EditorPlugin::on_second_monitor_fullscreen(
