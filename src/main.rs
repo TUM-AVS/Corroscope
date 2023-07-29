@@ -73,6 +73,11 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_plugins(elements::ElementsPlugin)
         .add_systems(Update, global_settings::animate_time);
 
+    app.insert_resource(bevy_mod_picking::selection::SelectionSettings {
+        click_nothing_deselect_all: true,
+        use_multiselect_default_inputs: false,
+    });
+
     #[cfg(feature = "debug_picking")]
     {
         use bevy_mod_picking::debug::DebugPickingMode::{Disabled, Normal};
@@ -105,10 +110,19 @@ fn main() -> color_eyre::eyre::Result<()> {
     {
         use std::io::Write;
 
-        let settings = bevy_mod_debugdump::render_graph::Settings::default();
-        let dot = bevy_mod_debugdump::render_graph_dot(&mut app, &settings);
-        let mut dot_file = std::fs::File::create("bevy_schedule.dot").unwrap();
-        dot_file.write_all(dot.as_bytes()).unwrap();
+        {
+            let settings = bevy_mod_debugdump::render_graph::Settings::default();
+            let dot = bevy_mod_debugdump::render_graph_dot(&mut app, &settings);
+            let mut dot_file = std::fs::File::create("bevy_render.dot").unwrap();
+            dot_file.write_all(dot.as_bytes()).unwrap();
+        }
+
+        {
+            let settings = bevy_mod_debugdump::schedule_graph::Settings::default();
+            let dot = bevy_mod_debugdump::schedule_graph_dot(&mut app, Update, &settings);
+            let mut dot_file = std::fs::File::create("bevy_schedule.dot").unwrap();
+            dot_file.write_all(dot.as_bytes()).unwrap();
+        }
     }
 
     app.run();
@@ -146,12 +160,9 @@ fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
     commonroad_pb::CommonRoad::decode(buf).unwrap()
 }
 
-use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_egui::EguiSettings;
-
 fn update_ui_scale_factor(
-    mut egui_settings: ResMut<EguiSettings>,
-    windows: Query<&Window, With<PrimaryWindow>>,
+    mut egui_settings: ResMut<bevy_egui::EguiSettings>,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
 ) {
     if let Ok(window) = windows.get_single() {
         egui_settings.scale_factor = 1.0 / window.scale_factor();

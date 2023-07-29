@@ -1,12 +1,6 @@
 use bevy::prelude::*;
 
-use bevy_mod_picking::prelude::*;
-use bevy_prototype_lyon::prelude::*;
-
-use bevy_egui::EguiContexts;
 use egui::plot::PlotPoint;
-
-use crate::global_settings::CurrentTimeStep;
 
 pub(crate) struct TrajectoryPlotData {
     velocity: egui::plot::Line,
@@ -135,6 +129,8 @@ pub(crate) fn plot_traj(
     let plot = |name: &'static str| {
         egui::plot::Plot::new(name)
             .legend(egui::plot::Legend::default().position(egui::plot::Corner::LeftBottom))
+            .allow_drag(false)
+            .allow_zoom(false)
             .view_aspect(2.0)
             .min_size(egui::Vec2::new(150.0, 75.0))
             .sharp_grid_lines(true)
@@ -215,7 +211,7 @@ pub(crate) fn plot_traj(
         }
     };
 
-    ui.heading("Orientation");
+    ui.heading("Global Orientation");
     let _theta_plot = plot("theta_plot")
         .center_y_axis(true)
         .label_formatter(angle_label_formatter)

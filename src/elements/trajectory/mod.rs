@@ -228,7 +228,7 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
         let headers = headers.clone();
         let sender = sender.clone();
 
-        let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send>>> =
+        let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send + Sync>>> =
             io_pool.spawn({
                 async move {
                     while !done.load(std::sync::atomic::Ordering::Relaxed) {
@@ -237,9 +237,9 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                         continue;
                     };
 
-                        let tl: TrajectoryLog = next.deserialize(Some(&headers)).unwrap(); //map_err(Box::new).map_err(std::sync::Arc::new)?;
+                        let tl: TrajectoryLog = next.deserialize(Some(&headers))?; //map_err(Box::new).map_err(std::sync::Arc::new)?;
                         if let Some(bundle) = make_trajectory_bundle(&tl) {
-                            sender.send((tl.time_step, bundle)).unwrap();
+                            sender.send((tl.time_step, bundle))?;
                         }
 
                         // bevy::log::info!("len={}", buf.len());
@@ -336,7 +336,7 @@ pub(crate) fn trajectory_group_visibility(
         return;
     }
     let time_step = time_step.time_step;
-    bevy::log::info!("updating group visibility");
+    bevy::log::debug!("updating group visibility");
 
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.time_step == time_step {
@@ -356,7 +356,7 @@ pub(crate) fn trajectory_visibility(
         return;
     }
 
-    bevy::log::info!("updating traj visibility");
+    bevy::log::debug!("updating traj visibility");
 
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.feasible || settings.show_infeasible {
