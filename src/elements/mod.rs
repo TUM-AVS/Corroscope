@@ -19,7 +19,8 @@ impl Plugin for ElementsPlugin {
             .add_systems(Update, trajectory::trajectory_window)
             // .add_systems(Update, obstacle::plot_obs)
             .add_systems(Update, obstacle::obstacle_tooltip)
-            .add_systems(Update, obstacle::trajectory_animation);
+            .add_systems(Update, obstacle::trajectory_animation)
+            .add_systems(Update, ref_path::ref_path_tooltip);
 
         app.register_type::<trajectory::TrajectoryLog>()
             .register_type::<trajectory::MainLog>()

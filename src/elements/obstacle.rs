@@ -11,8 +11,6 @@ use crate::commonroad_pb;
 use crate::commonroad_pb::{integer_exact_or_interval, CommonRoad};
 use egui::plot::PlotPoints;
 
-use bevy_mod_picking::prelude::*;
-
 fn state_transform(state: &commonroad_pb::State) -> Option<Transform> {
     let position: Vec2 = match state.position.as_ref()? {
         commonroad_pb::state::Position::Point(p) => Vec2::from(p.clone()),
@@ -124,7 +122,7 @@ pub fn spawn_obstacle(
     };
 
     let main_entity = commands
-        .spawn((Name::new("obstacle group"), SpatialBundle::default()))
+        .spawn((Name::new(format!("obstacle group {}", obs.dynamic_obstacle_id)), SpatialBundle::default()))
         .id();
 
     let _obstacle_entity = commands
