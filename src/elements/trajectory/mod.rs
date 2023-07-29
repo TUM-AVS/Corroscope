@@ -10,246 +10,11 @@ use bevy_egui::EguiContexts;
 use crate::global_settings::CurrentTimeStep;
 
 mod plot;
-fn deserialize_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de::Error;
 
-    let s: &str = serde::Deserialize::deserialize(deserializer)?;
+pub(crate) mod log;
 
-    s.to_lowercase().parse::<bool>().map_err(D::Error::custom)
-}
+pub(crate) use log::{TrajectoryLog, MainLog, KinematicData};
 
-fn deserialize_float_list<'de, D>(deserializer: D) -> Result<Vec<f64>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de::Error;
-
-    let s: std::borrow::Cow<'static, str> = serde::Deserialize::deserialize(deserializer)?;
-
-    s.split(',')
-        .map(|s| s.parse::<f64>())
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(D::Error::custom)
-}
-
-#[allow(non_snake_case)]
-#[derive(Debug, serde::Deserialize, Clone, Default, Reflect)]
-pub struct Costs {
-    Occ_PM_cost: f64,
-    Occ_UM_cost: f64,
-    Occ_VE_cost: f64,
-    acceleration_cost: f64,
-    distance_to_obstacles_cost: f64,
-    distance_to_reference_path_cost: f64,
-    jerk_cost: f64,
-    lane_center_offset_cost: f64,
-    lateral_jerk_cost: f64,
-    longitudinal_jerk_cost: f64,
-    orientation_offset_cost: f64,
-    path_length_cost: f64,
-    prediction_cost: f64,
-    responsibility_cost: f64,
-    velocity_cost: f64,
-    velocity_offset_cost: f64,
-}
-
-#[derive(Debug, serde::Deserialize, Clone, Default, Reflect)]
-pub struct KinematicData {
-    #[serde(deserialize_with = "deserialize_float_list")]
-    x_positions_m: Vec<f64>,
-    #[serde(deserialize_with = "deserialize_float_list")]
-    y_positions_m: Vec<f64>,
-    #[serde(deserialize_with = "deserialize_float_list")]
-    theta_orientations_rad: Vec<f64>,
-    #[serde(deserialize_with = "deserialize_float_list")]
-    kappa_rad: Vec<f64>,
-    #[serde(deserialize_with = "deserialize_float_list")]
-    curvilinear_orientations_rad: Vec<f64>,
-    #[serde(deserialize_with = "deserialize_float_list")]
-    velocities_mps: Vec<f64>,
-    #[serde(deserialize_with = "deserialize_float_list")]
-    accelerations_mps2: Vec<f64>,
-}
-
-impl KinematicData {
-    fn positions(&self) -> impl Iterator<Item = Vec2> + '_ {
-        std::iter::zip(self.x_positions_m.as_slice(), self.y_positions_m.as_slice())
-            .map(|(&x, &y)| Vec2::new(x as f32, y as f32))
-    }
-
-    fn make_plot_data(data: &[f64], shift: Option<i32>) -> Vec<[f64; 2]> {
-        let shift = shift.unwrap_or(0);
-
-        let pdata = data
-            .iter()
-            .enumerate()
-            .map(|(x, y)| [(shift + x as i32) as f64, *y])
-            .collect();
-
-        pdata
-    }
-
-    fn velocity_plot_data(&self, shift: Option<i32>) -> Vec<[f64; 2]> {
-        Self::make_plot_data(&self.velocities_mps, shift)
-    }
-
-    fn acceleration_plot_data(&self, shift: Option<i32>) -> Vec<[f64; 2]> {
-        Self::make_plot_data(&self.accelerations_mps2, shift)
-    }
-
-    fn orientation_plot_data(&self, shift: Option<i32>) -> Vec<[f64; 2]> {
-        Self::make_plot_data(&self.theta_orientations_rad, shift)
-    }
-
-    fn kappa_plot_data(&self, shift: Option<i32>) -> Vec<[f64; 2]> {
-        Self::make_plot_data(&self.kappa_rad, shift)
-    }
-
-    fn curvilinear_orientation_plot_data(&self, shift: Option<i32>) -> Vec<[f64; 2]> {
-        Self::make_plot_data(&self.curvilinear_orientations_rad, shift)
-    }
-}
-
-#[derive(Debug, serde::Deserialize, Clone, Component, Default, Reflect)]
-#[reflect(Component)]
-pub struct TrajectoryLog {
-    time_step: i32,
-    trajectory_number: i32,
-    unique_id: i32,
-    #[serde(deserialize_with = "deserialize_bool")]
-    feasible: bool,
-    horizon: f64,
-    dt: f64,
-    actual_traj_length: f64,
-
-    #[serde(flatten)]
-    kinematic_data: KinematicData,
-
-    s_position_m: f64,
-    d_position_m: f64,
-
-    ego_risk: Option<f64>,
-    obst_risk: Option<f64>,
-    costs_cumulative_weighted: f64,
-
-    #[serde(flatten)]
-    costs: std::collections::HashMap<String, f64>,
-
-    inf_kin_yaw_rate: f64,
-    inf_kin_acceleration: f64,
-    inf_kin_max_curvature: f64,
-    // inf_kin_max_curvature_rate: f64,
-}
-
-impl TrajectoryLog {
-    fn color(&self) -> Color {
-        if self.feasible {
-            Color::rgba_u8(
-                170_u8.saturating_sub((self.time_step as u8).saturating_mul(3)),
-                60,
-                90_u8, //.saturating_add(traj.unique_id),
-                40,    //100_u8.saturating_sub((traj.time_step as u8)), //.saturating_mul(4)),
-            )
-        } else {
-            Color::rgba_u8(
-                30, 70, 190, //.saturating_add(traj.unique_id),
-                100, //100_u8.saturating_sub((traj.time_step as u8)), //.saturating_mul(4)),
-            )
-        }
-    }
-
-    fn selected_color(&self) -> Color {
-        let base_color = self.color().as_hsla();
-        base_color + Color::hsla(0.0, 0.1, 0.3, 0.2)
-    }
-
-    fn velocity_plot_data(&self) -> Vec<[f64; 2]> {
-        self.kinematic_data.velocity_plot_data(Some(self.time_step))
-    }
-
-    fn acceleration_plot_data(&self) -> Vec<[f64; 2]> {
-        self.kinematic_data
-            .acceleration_plot_data(Some(self.time_step))
-    }
-
-    fn orientation_plot_data(&self) -> Vec<[f64; 2]> {
-        self.kinematic_data
-            .orientation_plot_data(Some(self.time_step))
-    }
-
-    fn kappa_plot_data(&self) -> Vec<[f64; 2]> {
-        self.kinematic_data.kappa_plot_data(Some(self.time_step))
-    }
-
-    fn curvilinear_orientation_plot_data(&self) -> Vec<[f64; 2]> {
-        self.kinematic_data
-            .curvilinear_orientation_plot_data(Some(self.time_step))
-    }
-}
-
-#[allow(dead_code, non_snake_case)]
-#[derive(Debug, serde::Deserialize, Clone, Component, Default, Reflect)]
-#[reflect(Component)]
-pub struct MainLog {
-    trajectory_number: i32,
-    calculation_time_s: f64,
-    x_position_vehicle_m: f64,
-    y_position_vehicle_m: f64,
-    #[serde(deserialize_with = "deserialize_bool")]
-    optimal_trajectory: bool,
-    percentage_feasible_traj: Option<f64>,
-
-    infeasible_kinematics_sum: f64,
-    inf_kin_acceleration: f64,
-    inf_kin_negative_s_velocity: f64,
-    inf_kin_max_s_idx: f64,
-    inf_kin_negative_v_velocity: f64,
-    inf_kin_max_curvature: f64,
-    inf_kin_yaw_rate: f64,
-    inf_kin_max_curvature_rate: f64,
-    inf_kin_vehicle_acc: f64,
-    inf_cartesian_transform: f64,
-    infeasible_collision: f64,
-
-    #[serde(flatten)]
-    kinematic_data: KinematicData,
-
-    s_position_m: f64,
-    d_position_m: f64,
-
-    ego_risk: Option<f64>,
-    obst_risk: Option<f64>,
-    costs_cumulative_weighted: f64,
-
-    #[serde(flatten)]
-    costs: Costs,
-}
-
-pub fn read_log(path: &std::path::Path) -> Result<Vec<TrajectoryLog>, Box<dyn std::error::Error>> {
-    let file = std::fs::File::open(path)?;
-
-    let map = unsafe { memmap2::MmapOptions::new().populate().map(&file)? };
-    let cursor = std::io::Cursor::new(map);
-
-    let mut rdr = csv::ReaderBuilder::new()
-        .delimiter(b';')
-        .from_reader(cursor);
-
-    let res = rdr.deserialize().collect::<Result<Vec<_>, _>>()?;
-
-    Ok(res)
-}
-
-pub fn read_main_log(path: &std::path::Path) -> Result<Vec<MainLog>, Box<dyn std::error::Error>> {
-    let mut rdr = csv::ReaderBuilder::new().delimiter(b';').from_path(path)?;
-
-    let res = rdr.deserialize().collect::<Result<Vec<_>, _>>()?;
-
-    Ok(res)
-}
 
 #[derive(Resource)]
 pub struct MainTrajectory {
@@ -400,7 +165,7 @@ fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory
 pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) {
     let main_trajectories_path = std::path::Path::join(&args.logs, "logs.csv");
     let main_trajectories =
-        read_main_log(&main_trajectories_path).expect("could not read trajectory logs");
+        log::read_main_log(&main_trajectories_path).expect("could not read trajectory logs");
     let (mtraj_res, mtraj_bundle) = make_main_trajectory_bundle(&main_trajectories);
 
     commands.insert_resource(mtraj_res);
@@ -578,7 +343,7 @@ pub(crate) fn trajectory_group_visibility(
     }
 }
 
-pub fn trajectory_visibility(
+pub(crate) fn trajectory_visibility(
     mut trajectory_q: Query<(&TrajectoryLog, &mut Visibility)>,
 
     settings: Res<crate::global_settings::GlobalSettings>,
@@ -614,7 +379,7 @@ pub fn trajectory_cursor(
     }
 }
 
-pub fn trajectory_tooltip(
+pub(crate) fn trajectory_tooltip(
     mut contexts: EguiContexts,
 
     trajectory_q: Query<&TrajectoryLog, With<HoveredTrajectory>>,
@@ -659,12 +424,84 @@ pub fn trajectory_tooltip(
     );
 }
 
-pub fn trajectory_window(
-    mut commands: Commands,
+fn trajectory_description(ui: &mut bevy_egui::egui::Ui, traj: &TrajectoryLog, plot_data: plot::TrajectoryPlotData, time_step: f32) {
+    ui.label(egui::RichText::new(format!("Trajectory {}", traj.trajectory_number)).heading().size(30.0));
+    // ui.label(format!("type: {:#?}", obs.obstacle_type()));
+
+    ui.heading("Overview");
+    ui.label(format!("feasible: {}", traj.feasible));
+
+    let resp = ui.label(format!("total cost: {:.3}", traj.costs_cumulative_weighted));
+    resp.on_hover_text(traj.costs_cumulative_weighted.to_string());
+    // ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
+
+    ui.separator();
+
+    use egui_extras::{TableBuilder, Column};
+    TableBuilder::new(ui)
+        .cell_layout(egui::Layout {
+            main_align: egui::Align::Max,
+            ..default()
+        })
+        .striped(true)
+        .column(Column::initial(250.0).resizable(true))
+        .column(Column::exact(70.0))
+        .header(25.0, |mut header| {
+            header.col(|ui| {
+                ui.heading("Cost name");
+            });
+            header.col(|ui| {
+                ui.heading("Value");
+            });
+        })
+        .body(|mut body| {
+            for (k, v) in traj.sorted_nonzero_costs() {
+                body.row(18.0, |mut row| {
+                    row.col(|ui| {
+                        ui.label(egui::RichText::new(k).monospace());
+                    });
+                    row.col(|ui| {
+                        let layout = egui::Layout::left_to_right(egui::Align::Center)
+                            .with_main_align(egui::Align::Max)
+                            .with_main_justify(true);
+                        ui.with_layout(layout, |ui| {
+                            let resp = ui.label(format!("{:>7.3}", v));
+                            resp.on_hover_text(v.to_string());
+                        });
+                    });
+                });
+            }
+        });
+
+    ui.separator();
+
+    ui.group(|ui| {
+    ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
+    ui.label(format!(
+        "inf_kin_acceleration: {}",
+        traj.inf_kin_acceleration
+    ));
+    ui.label(format!(
+        "inf_kin_max_curvature: {}",
+        traj.inf_kin_max_curvature
+    ));
+    //ui.label(format!(
+    //    "inf_kin_max_curvature_rate: {}",
+    //    traj.inf_kin_max_curvature_rate
+    //));
+    });
+
+    ui.separator();
+
+    plot::plot_traj(plot_data, ui, time_step);
+}
+
+pub(crate) fn trajectory_window(
+    commands: Commands,
 
     mut contexts: EguiContexts,
 
-    mut trajectory_q: Query<(Entity, &TrajectoryLog, &PickSelection)>,
+    trajectory_q: Query<(Entity, &TrajectoryLog, &PickSelection)>,
 
     cts: Res<CurrentTimeStep>,
 
@@ -675,7 +512,7 @@ pub fn trajectory_window(
     let ctx = contexts.ctx_mut();
 
     let mut selected_traj = Option::None;
-    for (entity, traj, selected) in trajectory_q.iter_mut() {
+    for (entity, traj, selected) in trajectory_q.iter() {
         if selected.is_selected {
             selected_traj = Some((entity, traj));
         }
@@ -685,11 +522,14 @@ pub fn trajectory_window(
     egui::SidePanel::right(panel_id)
         .exact_width(500.0)
         .show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.set_max_width(440.0);
+            egui::ScrollArea::vertical()
+                .max_width(440.0)
+                .show(ui, |ui| {
                 let Some((entity, traj)) = selected_traj else {
-                *cached_plot_data = None;
-                return;
-            };
+                    *cached_plot_data = None;
+                    return;
+                };
 
                 let cplot_data = match cached_plot_data.as_ref() {
                     Some(data) => {
@@ -713,61 +553,9 @@ pub fn trajectory_window(
                     }
                 };
 
-                ui.heading(format!("Trajectory {}", traj.trajectory_number));
-                // ui.label(format!("type: {:#?}", obs.obstacle_type()));
-
-                ui.label(format!("feasible: {}", traj.feasible));
-
-                ui.label(format!("total cost: {}", traj.costs_cumulative_weighted));
-                // ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
-
-                use egui_extras::{TableBuilder, Column};
-                TableBuilder::new(ui)
-                    .cell_layout(egui::Layout {
-                        main_align: egui::Align::Max,
-                        ..default()
-                    })
-                    .striped(true)
-                    .column(Column::initial(150.0).resizable(true))
-                    .column(Column::initial(50.0))
-                    .header(20.0, |mut header| {
-                        header.col(|ui| {
-                            ui.heading("Cost type");
-                        });
-                        header.col(|ui| {
-                            ui.heading("Value");
-                        });
-                    })
-                    .body(|mut body| {
-                        for (k, v) in traj.costs.iter() {
-                            body.row(30.0, |mut row| {
-                                row.col(|ui| {
-                                    ui.label(k);
-                                });
-                                row.col(|ui| {
-                                    ui.label(format!("{:.2}", v));
-                                });
-                            });
-                        }
-                    });
-
-                ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
-                ui.label(format!(
-                    "inf_kin_acceleration: {}",
-                    traj.inf_kin_acceleration
-                ));
-                ui.label(format!(
-                    "inf_kin_max_curvature: {}",
-                    traj.inf_kin_max_curvature
-                ));
-                //ui.label(format!(
-                //    "inf_kin_max_curvature_rate: {}",
-                //    traj.inf_kin_max_curvature_rate
-                //));
-
                 let plot_data = plot::TrajectoryPlotData::from_data(cplot_data);
 
-                plot::plot_traj(plot_data, ui, cts.dynamic_time_step.round());
+                trajectory_description(ui, traj, plot_data, cts.dynamic_time_step.round());
 
                 return;
 
@@ -784,9 +572,9 @@ pub fn trajectory_window(
                         }
 
                         let Some(pos) = traj
-                        .kinematic_data
-                        .positions()
-                        .nth(ts as usize)
+                            .kinematic_data
+                            .positions()
+                            .nth(ts as usize)
                         else { return; };
 
                         let pointer_shape = bevy_prototype_lyon::shapes::Circle {
