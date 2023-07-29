@@ -114,10 +114,14 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
             transform: Transform::from_xyz(0.0, 0.0, 4.0 + (traj.unique_id as f32) * 1e-6),
             ..default()
         },
-        Stroke::new(traj.color(), 0.05),
+        {
+            let mut stroke = Stroke::new(traj.color(), 0.02);
+            stroke.options.tolerance = 10.0;
+            stroke
+        },
 
-        On::<Pointer<Select>>::target_insert(Stroke::new(selected_color, 0.05)),
-        On::<Pointer<Deselect>>::target_insert(Stroke::new(normal_color, 0.05)),
+        On::<Pointer<Select>>::target_insert(Stroke::new(selected_color, 0.02)),
+        On::<Pointer<Deselect>>::target_insert(Stroke::new(normal_color, 0.02)),
 
         On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
             commands.insert(HoveredTrajectory);
