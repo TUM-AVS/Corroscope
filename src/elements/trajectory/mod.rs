@@ -428,7 +428,7 @@ pub(crate) fn trajectory_tooltip(
     );
 }
 
-fn trajectory_description(ui: &mut bevy_egui::egui::Ui, traj: &TrajectoryLog, plot_data: plot::TrajectoryPlotData, time_step: f32) {
+fn trajectory_description(ui: &mut bevy_egui::egui::Ui, traj: &TrajectoryLog, plot_data: plot::TrajectoryPlotData, time_step: f32) -> Option<f64> {
     ui.label(egui::RichText::new(format!("Trajectory {}", traj.trajectory_number)).heading().size(30.0));
     // ui.label(format!("type: {:#?}", obs.obstacle_type()));
 
@@ -497,11 +497,11 @@ fn trajectory_description(ui: &mut bevy_egui::egui::Ui, traj: &TrajectoryLog, pl
 
     ui.separator();
 
-    plot::plot_traj(plot_data, ui, time_step);
+    plot::plot_traj(plot_data, ui, time_step)
 }
 
 pub(crate) fn trajectory_window(
-    commands: Commands,
+    mut commands: Commands,
 
     mut contexts: EguiContexts,
 
@@ -559,12 +559,16 @@ pub(crate) fn trajectory_window(
 
                 let plot_data = plot::TrajectoryPlotData::from_data(cplot_data);
 
-                trajectory_description(ui, traj, plot_data, cts.dynamic_time_step.round());
+                let xcursor = trajectory_description(ui, traj, plot_data, cts.dynamic_time_step.round());
 
-                return;
+                // TODO: Fix remaining trajectory cursor issues
+                let enable_trajectory_cursor = false;
+                if !enable_trajectory_cursor {
+                    return;
+                }
 
                 commands.entity(entity).despawn_descendants();
-                match plot::plot_traj(plot_data, ui, cts.dynamic_time_step.round()) {
+                match xcursor {
                     None => {}
                     Some(ts) => {
                         let mut ts = ts.round() as i32;

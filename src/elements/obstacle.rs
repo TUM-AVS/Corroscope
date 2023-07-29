@@ -39,40 +39,27 @@ pub struct HoveredObstacle;
 pub fn obstacle_tooltip(
     mut contexts: EguiContexts,
 
-    obstacle_q: Query<(&ObstacleData, &Transform), With<HoveredObstacle>>,
+    obstacle_q: Query<&ObstacleData, With<HoveredObstacle>>,
 ) {
     let ctx = contexts.ctx_mut();
 
     let base_id = egui::Id::new("obstacle tooltip");
-    for (ObstacleData(obs), transform) in obstacle_q.iter() {
-        let tt_pos: egui::Pos2 = obs
-            .initial_state
-            .position
-            .as_ref()
-            .unwrap()
-            .to_owned()
-            .try_into()
-            .unwrap();
-
+    for ObstacleData(obs) in obstacle_q.iter() {
         egui::containers::show_tooltip(
             ctx,
             base_id.with(obs.dynamic_obstacle_id),
-            // Some(tt_pos),
             |ui| {
                 ui.heading(format!(
                     "Obstacle {} (type {:#?})",
                     obs.dynamic_obstacle_id,
                     obs.obstacle_type()
                 ));
-                // ui.label(format!("type: {:#?}", obs.obstacle_type()));
 
                 ui.label(format!("signal series: {:#?}", obs.signal_series));
                 ui.label(format!(
                     "initial signal state: {:#?}",
                     obs.initial_signal_state
                 ));
-
-                // ui.label(format!("initial state: {:#?}", obs.initial_state));
             },
         );
     }
