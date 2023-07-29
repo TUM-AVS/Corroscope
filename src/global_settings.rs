@@ -66,10 +66,16 @@ pub fn side_panel(
             ui.label(format!("{:#?}", cr.information));
 
             ui.heading("Display Settings");
-            ui.checkbox(&mut new_settings.show_infeasible, "Show infeasible trajectories");
+            ui.checkbox(
+                &mut new_settings.show_infeasible,
+                "Show infeasible trajectories",
+            );
 
             ui.heading("Time Control");
-            ui.checkbox(&mut new_settings.enable_time_animation, "Enable time progression");
+            ui.checkbox(
+                &mut new_settings.enable_time_animation,
+                "Enable time progression",
+            );
 
             ui.style_mut().spacing.slider_width = 300.0;
             let range = cts.prediction_range.clone();

@@ -13,21 +13,13 @@ pub struct RefPath {
 #[derive(Clone, Copy, Component, Reflect)]
 pub struct HoveredRefPath;
 
-pub fn ref_path_tooltip(
-    mut contexts: bevy_egui::EguiContexts,
-
-    ref_path_q: Query<&HoveredRefPath>,
-) {
+pub fn ref_path_tooltip(mut contexts: bevy_egui::EguiContexts, ref_path_q: Query<&HoveredRefPath>) {
     let ctx = contexts.ctx_mut();
 
     if !ref_path_q.is_empty() {
-        egui::containers::show_tooltip(
-            ctx,
-            egui::Id::new("ref path tooltip"),
-            |ui| {
-                ui.heading("Reference Path");
-            },
-        );
+        egui::containers::show_tooltip(ctx, egui::Id::new("ref path tooltip"), |ui| {
+            ui.heading("Reference Path");
+        });
     }
 }
 
@@ -66,10 +58,8 @@ pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>) {
             ..default()
         },
         Stroke::new(reference_path_color, 0.1),
-
         PickableBundle::default(),
         RaycastPickTarget::default(),
-
         On::<Pointer<Over>>::target_insert(HoveredRefPath),
         On::<Pointer<Out>>::target_remove::<HoveredRefPath>(),
     ));

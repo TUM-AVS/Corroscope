@@ -148,20 +148,12 @@ impl TrajectoryLog {
             } else {
                 let unit_cost = self.costs_cumulative_weighted / 20.0;
                 let cost_val = 37.0 + (unit_cost.fract() * 360.0);
-                let c = Color::hsla(
-                    cost_val as f32,
-                    0.7,
-                    0.8,
-                    0.4,
-                );
+                let c = Color::hsla(cost_val as f32, 0.7, 0.8, 0.4);
                 bevy::log::debug!("color={:?}", c);
                 c
             }
         } else {
-            Color::rgba_u8(
-                30, 70, 190,
-                100,
-            )
+            Color::rgba_u8(30, 70, 190, 100)
         }
     }
 
@@ -201,7 +193,7 @@ impl TrajectoryLog {
             .filter(|(_k, v)| *v > 1e-3)
             .collect::<Vec<(_, f64)>>();
 
-        cost_values.sort_by(|(_k1,v1), (_k2,v2)| v1.partial_cmp(v2).unwrap() );
+        cost_values.sort_by(|(_k1, v1), (_k2, v2)| v1.partial_cmp(v2).unwrap());
 
         cost_values.into_iter().rev()
     }
@@ -216,7 +208,6 @@ pub struct MainLog {
     pub(crate) x_position_vehicle_m: f64,
     pub(crate) y_position_vehicle_m: f64,
     #[serde(deserialize_with = "deserialize_bool")]
-
     pub(crate) optimal_trajectory: bool,
     pub(crate) percentage_feasible_traj: Option<f64>,
     pub(crate) infeasible_kinematics_sum: f64,
@@ -245,7 +236,9 @@ pub struct MainLog {
     pub(crate) costs: Costs,
 }
 
-pub(crate) fn read_log(path: &std::path::Path) -> Result<Vec<TrajectoryLog>, Box<dyn std::error::Error>> {
+pub(crate) fn read_log(
+    path: &std::path::Path,
+) -> Result<Vec<TrajectoryLog>, Box<dyn std::error::Error>> {
     let file = std::fs::File::open(path)?;
 
     let map = unsafe { memmap2::MmapOptions::new().populate().map(&file)? };
@@ -260,7 +253,9 @@ pub(crate) fn read_log(path: &std::path::Path) -> Result<Vec<TrajectoryLog>, Box
     Ok(res)
 }
 
-pub(crate) fn read_main_log(path: &std::path::Path) -> Result<Vec<MainLog>, Box<dyn std::error::Error>> {
+pub(crate) fn read_main_log(
+    path: &std::path::Path,
+) -> Result<Vec<MainLog>, Box<dyn std::error::Error>> {
     let mut rdr = csv::ReaderBuilder::new().delimiter(b';').from_path(path)?;
 
     let res = rdr.deserialize().collect::<Result<Vec<_>, _>>()?;

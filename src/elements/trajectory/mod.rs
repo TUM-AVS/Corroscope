@@ -13,8 +13,7 @@ mod plot;
 
 pub(crate) mod log;
 
-pub(crate) use log::{TrajectoryLog, MainLog, KinematicData};
-
+pub(crate) use log::{KinematicData, MainLog, TrajectoryLog};
 
 #[derive(Resource)]
 pub struct MainTrajectory {
@@ -119,10 +118,8 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
             stroke.options.tolerance = 10.0;
             stroke
         },
-
         On::<Pointer<Select>>::target_insert(Stroke::new(selected_color, 0.02)),
         On::<Pointer<Deselect>>::target_insert(Stroke::new(normal_color, 0.02)),
-
         On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
             commands.insert(HoveredTrajectory);
         }),
@@ -133,7 +130,6 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
         RaycastPickTarget::default(),
     ))
 }
-
 
 fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory, impl Bundle) {
     let mpoints = main_trajectories
@@ -228,14 +224,14 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
         let headers = headers.clone();
         let sender = sender.clone();
 
-        let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send + Sync>>> =
-            io_pool.spawn({
+        let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send + Sync>>> = io_pool
+            .spawn({
                 async move {
                     while !done.load(std::sync::atomic::Ordering::Relaxed) {
                         let Some(next) = buf.pop_ref() else {
-                        std::thread::yield_now();
-                        continue;
-                    };
+                            std::thread::yield_now();
+                            continue;
+                        };
 
                         let tl: TrajectoryLog = next.deserialize(Some(&headers))?; //map_err(Box::new).map_err(std::sync::Arc::new)?;
                         if let Some(bundle) = make_trajectory_bundle(&tl) {
@@ -428,8 +424,17 @@ pub(crate) fn trajectory_tooltip(
     );
 }
 
-fn trajectory_description(ui: &mut bevy_egui::egui::Ui, traj: &TrajectoryLog, plot_data: plot::TrajectoryPlotData, time_step: f32) -> Option<f64> {
-    ui.label(egui::RichText::new(format!("Trajectory {}", traj.trajectory_number)).heading().size(30.0));
+fn trajectory_description(
+    ui: &mut bevy_egui::egui::Ui,
+    traj: &TrajectoryLog,
+    plot_data: plot::TrajectoryPlotData,
+    time_step: f32,
+) -> Option<f64> {
+    ui.label(
+        egui::RichText::new(format!("Trajectory {}", traj.trajectory_number))
+            .heading()
+            .size(30.0),
+    );
     // ui.label(format!("type: {:#?}", obs.obstacle_type()));
 
     ui.heading("Overview");
@@ -441,7 +446,7 @@ fn trajectory_description(ui: &mut bevy_egui::egui::Ui, traj: &TrajectoryLog, pl
 
     ui.separator();
 
-    use egui_extras::{TableBuilder, Column};
+    use egui_extras::{Column, TableBuilder};
     TableBuilder::new(ui)
         .cell_layout(egui::Layout {
             main_align: egui::Align::Max,
@@ -480,19 +485,19 @@ fn trajectory_description(ui: &mut bevy_egui::egui::Ui, traj: &TrajectoryLog, pl
     ui.separator();
 
     ui.group(|ui| {
-    ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
-    ui.label(format!(
-        "inf_kin_acceleration: {}",
-        traj.inf_kin_acceleration
-    ));
-    ui.label(format!(
-        "inf_kin_max_curvature: {}",
-        traj.inf_kin_max_curvature
-    ));
-    //ui.label(format!(
-    //    "inf_kin_max_curvature_rate: {}",
-    //    traj.inf_kin_max_curvature_rate
-    //));
+        ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
+        ui.label(format!(
+            "inf_kin_acceleration: {}",
+            traj.inf_kin_acceleration
+        ));
+        ui.label(format!(
+            "inf_kin_max_curvature: {}",
+            traj.inf_kin_max_curvature
+        ));
+        //ui.label(format!(
+        //    "inf_kin_max_curvature_rate: {}",
+        //    traj.inf_kin_max_curvature_rate
+        //));
     });
 
     ui.separator();
@@ -530,81 +535,80 @@ pub(crate) fn trajectory_window(
             egui::ScrollArea::vertical()
                 .max_width(440.0)
                 .show(ui, |ui| {
-                let Some((entity, traj)) = selected_traj else {
-                    *cached_plot_data = None;
-                    return;
-                };
+                    let Some((entity, traj)) = selected_traj else {
+                        *cached_plot_data = None;
+                        return;
+                    };
 
-                let cplot_data = match cached_plot_data.as_ref() {
-                    Some(data) => {
-                        if data.time_step == traj.time_step
-                            && data.trajectory_number == traj.trajectory_number
-                            && data.unique_id == traj.unique_id
-                        {
-                            data.clone()
-                        } else {
+                    let cplot_data = match cached_plot_data.as_ref() {
+                        Some(data) => {
+                            if data.time_step == traj.time_step
+                                && data.trajectory_number == traj.trajectory_number
+                                && data.unique_id == traj.unique_id
+                            {
+                                data.clone()
+                            } else {
+                                let cplot_data =
+                                    plot::CachedTrajectoryPlotData::from_trajectory(&mtraj, traj);
+                                *cached_plot_data = Some(cplot_data.clone());
+                                cplot_data
+                            }
+                        }
+                        None => {
                             let cplot_data =
                                 plot::CachedTrajectoryPlotData::from_trajectory(&mtraj, traj);
                             *cached_plot_data = Some(cplot_data.clone());
                             cplot_data
                         }
+                    };
+
+                    let plot_data = plot::TrajectoryPlotData::from_data(cplot_data);
+
+                    let xcursor =
+                        trajectory_description(ui, traj, plot_data, cts.dynamic_time_step.round());
+
+                    // TODO: Fix remaining trajectory cursor issues
+                    let enable_trajectory_cursor = false;
+                    if !enable_trajectory_cursor {
+                        return;
                     }
-                    None => {
-                        let cplot_data =
-                            plot::CachedTrajectoryPlotData::from_trajectory(&mtraj, traj);
-                        *cached_plot_data = Some(cplot_data.clone());
-                        cplot_data
-                    }
-                };
 
-                let plot_data = plot::TrajectoryPlotData::from_data(cplot_data);
+                    commands.entity(entity).despawn_descendants();
+                    match xcursor {
+                        None => {}
+                        Some(ts) => {
+                            let mut ts = ts.round() as i32;
 
-                let xcursor = trajectory_description(ui, traj, plot_data, cts.dynamic_time_step.round());
+                            if ts >= traj.time_step {
+                                ts -= traj.time_step;
+                            } else {
+                                return;
+                            }
 
-                // TODO: Fix remaining trajectory cursor issues
-                let enable_trajectory_cursor = false;
-                if !enable_trajectory_cursor {
-                    return;
-                }
+                            let Some(pos) = traj.kinematic_data.positions().nth(ts as usize) else {
+                                return;
+                            };
 
-                commands.entity(entity).despawn_descendants();
-                match xcursor {
-                    None => {}
-                    Some(ts) => {
-                        let mut ts = ts.round() as i32;
+                            let pointer_shape = bevy_prototype_lyon::shapes::Circle {
+                                radius: 1e3,
+                                center: Vec2::ZERO,
+                            };
 
-                        if ts >= traj.time_step {
-                            ts -= traj.time_step;
-                        } else {
-                            return;
+                            commands.entity(entity).with_children(|builder| {
+                                builder.spawn((
+                                    Name::new("pointer trajectory"),
+                                    PointerTimeStep::default(),
+                                    ShapeBundle {
+                                        path: GeometryBuilder::build_as(&pointer_shape),
+                                        transform: Transform::from_translation(pos.extend(100.0))
+                                            .with_scale(Vec3::splat(1e-4)),
+                                        ..default()
+                                    },
+                                    Fill::color(Color::ORANGE_RED.with_a(0.6)),
+                                ));
+                            });
                         }
-
-                        let Some(pos) = traj
-                            .kinematic_data
-                            .positions()
-                            .nth(ts as usize)
-                        else { return; };
-
-                        let pointer_shape = bevy_prototype_lyon::shapes::Circle {
-                            radius: 1e3,
-                            center: Vec2::ZERO,
-                        };
-
-                        commands.entity(entity).with_children(|builder| {
-                            builder.spawn((
-                                Name::new("pointer trajectory"),
-                                PointerTimeStep::default(),
-                                ShapeBundle {
-                                    path: GeometryBuilder::build_as(&pointer_shape),
-                                    transform: Transform::from_translation(pos.extend(100.0))
-                                        .with_scale(Vec3::splat(1e-4)),
-                                    ..default()
-                                },
-                                Fill::color(Color::ORANGE_RED.with_a(0.6)),
-                            ));
-                        });
-                    }
-                };
-            });
+                    };
+                });
         });
 }

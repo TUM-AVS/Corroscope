@@ -45,23 +45,19 @@ pub fn obstacle_tooltip(
 
     let base_id = egui::Id::new("obstacle tooltip");
     for ObstacleData(obs) in obstacle_q.iter() {
-        egui::containers::show_tooltip(
-            ctx,
-            base_id.with(obs.dynamic_obstacle_id),
-            |ui| {
-                ui.heading(format!(
-                    "Obstacle {} (type {:#?})",
-                    obs.dynamic_obstacle_id,
-                    obs.obstacle_type()
-                ));
+        egui::containers::show_tooltip(ctx, base_id.with(obs.dynamic_obstacle_id), |ui| {
+            ui.heading(format!(
+                "Obstacle {} (type {:#?})",
+                obs.dynamic_obstacle_id,
+                obs.obstacle_type()
+            ));
 
-                ui.label(format!("signal series: {:#?}", obs.signal_series));
-                ui.label(format!(
-                    "initial signal state: {:#?}",
-                    obs.initial_signal_state
-                ));
-            },
-        );
+            ui.label(format!("signal series: {:#?}", obs.signal_series));
+            ui.label(format!(
+                "initial signal state: {:#?}",
+                obs.initial_signal_state
+            ));
+        });
     }
 }
 
@@ -109,7 +105,10 @@ pub fn spawn_obstacle(
     };
 
     let main_entity = commands
-        .spawn((Name::new(format!("obstacle group {}", obs.dynamic_obstacle_id)), SpatialBundle::default()))
+        .spawn((
+            Name::new(format!("obstacle group {}", obs.dynamic_obstacle_id)),
+            SpatialBundle::default(),
+        ))
         .id();
 
     let _obstacle_entity = commands
@@ -142,8 +141,11 @@ pub fn spawn_obstacle(
         ))
         .set_parent_in_place(main_entity);
 
-    let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) = &obs.prediction
-        else { return None; };
+    let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) =
+        &obs.prediction
+    else {
+        return None;
+    };
 
     let max_ts = traj
         .trajectory
@@ -188,8 +190,11 @@ pub fn spawn_obstacle(
 }
 
 fn velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
-    let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) = &obs.prediction.as_ref()?
-        else { return None; };
+    let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) =
+        &obs.prediction.as_ref()?
+    else {
+        return None;
+    };
 
     let velocity_pts = traj
         .trajectory
@@ -206,8 +211,11 @@ fn velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
 }
 
 fn numerical_velocity_points(obs: &commonroad_pb::DynamicObstacle) -> Option<PlotPoints> {
-    let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) = &obs.prediction.as_ref()?
-        else { return None; };
+    let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) =
+        &obs.prediction.as_ref()?
+    else {
+        return None;
+    };
 
     let velocity_pts = traj
         .trajectory
@@ -257,8 +265,11 @@ pub fn trajectory_animation(
     cts: Res<crate::global_settings::CurrentTimeStep>,
 ) {
     for (obs, mut transform) in obstacle_q.iter_mut() {
-        let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) = &obs.0.prediction.as_ref().unwrap()
-            else { return; };
+        let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) =
+            &obs.0.prediction.as_ref().unwrap()
+        else {
+            return;
+        };
         let states = &traj.trajectory.states;
 
         *transform = lerp_states(states, cts.dynamic_time_step).unwrap();
