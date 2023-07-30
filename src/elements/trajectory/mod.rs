@@ -28,34 +28,34 @@ fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
     let x_positions_m = mtraj
         .iter()
         .map(|traj| traj.x_position_vehicle_m)
-        .collect::<Vec<f64>>();
+        .collect::<Vec<f32>>();
     let y_positions_m = mtraj
         .iter()
         .map(|traj| traj.y_position_vehicle_m)
-        .collect::<Vec<f64>>();
+        .collect::<Vec<f32>>();
 
     let velocities_mps = mtraj
         .iter()
         .map(|traj| traj.kinematic_data.velocities_mps.first().copied())
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     let accelerations_mps2 = mtraj
         .iter()
         .map(|traj| traj.kinematic_data.accelerations_mps2.first().copied())
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     let theta_orientations_rad = mtraj
         .iter()
         .map(|traj| traj.kinematic_data.theta_orientations_rad.first().copied())
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     let kappa_rad = mtraj
         .iter()
         .map(|traj| traj.kinematic_data.kappa_rad.first().copied())
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     let curvilinear_orientations_rad = mtraj
@@ -66,7 +66,7 @@ fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
                 .first()
                 .copied()
         })
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     KinematicData {

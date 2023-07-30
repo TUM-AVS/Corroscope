@@ -11,7 +11,7 @@ where
     s.to_lowercase().parse::<bool>().map_err(D::Error::custom)
 }
 
-fn deserialize_float_list<'de, D>(deserializer: D) -> Result<Vec<f64>, D::Error>
+fn deserialize_float_list<'de, D>(deserializer: D) -> Result<Vec<f32>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -20,7 +20,7 @@ where
     let s: std::borrow::Cow<'static, str> = serde::Deserialize::deserialize(deserializer)?;
 
     s.split(',')
-        .map(|s| s.parse::<f64>())
+        .map(|s| s.parse::<f32>())
         .collect::<Result<Vec<_>, _>>()
         .map_err(D::Error::custom)
 }
@@ -49,19 +49,19 @@ pub(crate) struct Costs {
 #[derive(Debug, serde::Deserialize, Clone, Default, Reflect)]
 pub(crate) struct KinematicData {
     #[serde(deserialize_with = "deserialize_float_list")]
-    pub(crate) x_positions_m: Vec<f64>,
+    pub(crate) x_positions_m: Vec<f32>,
     #[serde(deserialize_with = "deserialize_float_list")]
-    pub(crate) y_positions_m: Vec<f64>,
+    pub(crate) y_positions_m: Vec<f32>,
     #[serde(deserialize_with = "deserialize_float_list")]
-    pub(crate) theta_orientations_rad: Vec<f64>,
+    pub(crate) theta_orientations_rad: Vec<f32>,
     #[serde(deserialize_with = "deserialize_float_list")]
-    pub(crate) kappa_rad: Vec<f64>,
+    pub(crate) kappa_rad: Vec<f32>,
     #[serde(deserialize_with = "deserialize_float_list")]
-    pub(crate) curvilinear_orientations_rad: Vec<f64>,
+    pub(crate) curvilinear_orientations_rad: Vec<f32>,
     #[serde(deserialize_with = "deserialize_float_list")]
-    pub(crate) velocities_mps: Vec<f64>,
+    pub(crate) velocities_mps: Vec<f32>,
     #[serde(deserialize_with = "deserialize_float_list")]
-    pub(crate) accelerations_mps2: Vec<f64>,
+    pub(crate) accelerations_mps2: Vec<f32>,
 }
 
 impl KinematicData {
@@ -70,13 +70,13 @@ impl KinematicData {
             .map(|(&x, &y)| Vec2::new(x as f32, y as f32))
     }
 
-    fn make_plot_data(data: &[f64], shift: Option<i32>) -> Vec<[f64; 2]> {
+    fn make_plot_data(data: &[f32], shift: Option<i32>) -> Vec<[f64; 2]> {
         let shift = shift.unwrap_or(0);
 
         let pdata = data
             .iter()
             .enumerate()
-            .map(|(x, y)| [(shift + x as i32) as f64, *y])
+            .map(|(x, y)| [(shift + x as i32) as f64, *y as f64])
             .collect();
 
         pdata
@@ -205,8 +205,8 @@ impl TrajectoryLog {
 pub struct MainLog {
     pub(crate) trajectory_number: i32,
     pub(crate) calculation_time_s: f64,
-    pub(crate) x_position_vehicle_m: f64,
-    pub(crate) y_position_vehicle_m: f64,
+    pub(crate) x_position_vehicle_m: f32,
+    pub(crate) y_position_vehicle_m: f32,
     #[serde(deserialize_with = "deserialize_bool")]
     pub(crate) optimal_trajectory: bool,
     pub(crate) percentage_feasible_traj: Option<f64>,
@@ -275,35 +275,35 @@ pub struct HoveredTrajectory;
 fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
     let x_positions_m = mtraj
         .iter()
-        .map(|traj| traj.x_position_vehicle_m)
-        .collect::<Vec<f64>>();
+        .map(|traj| traj.x_position_vehicle_m as f32)
+        .collect::<Vec<f32>>();
     let y_positions_m = mtraj
         .iter()
-        .map(|traj| traj.y_position_vehicle_m)
-        .collect::<Vec<f64>>();
+        .map(|traj| traj.y_position_vehicle_m as f32)
+        .collect::<Vec<f32>>();
 
     let velocities_mps = mtraj
         .iter()
         .map(|traj| traj.kinematic_data.velocities_mps.first().copied())
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     let accelerations_mps2 = mtraj
         .iter()
         .map(|traj| traj.kinematic_data.accelerations_mps2.first().copied())
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     let theta_orientations_rad = mtraj
         .iter()
         .map(|traj| traj.kinematic_data.theta_orientations_rad.first().copied())
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     let kappa_rad = mtraj
         .iter()
         .map(|traj| traj.kinematic_data.kappa_rad.first().copied())
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     let curvilinear_orientations_rad = mtraj
@@ -314,7 +314,7 @@ fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
                 .first()
                 .copied()
         })
-        .collect::<Option<Vec<f64>>>()
+        .collect::<Option<Vec<f32>>>()
         .unwrap();
 
     KinematicData {
