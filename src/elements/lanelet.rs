@@ -144,7 +144,11 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) 
     };
 
     let main_entity = commands
-        .spawn((Name::new("lanelet"), Lanelet, SpatialBundle::default()))
+        .spawn((
+            Name::new(format!("lanelet {}", lanelet.lanelet_id)),
+            Lanelet,
+            SpatialBundle::default(),
+        ))
         .id();
 
     commands

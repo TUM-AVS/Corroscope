@@ -34,6 +34,8 @@ bevy_framepace = "0.13.3"
 bevy-inspector-egui = { version = "0.19.0", optional = false }
 bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls.git", branch = "main", optional = true }
 
+bevy_mod_debugdump = { version = "0.8.0", optional = true }
+
 egui = { version = "0.22.0", features = [
     "mint",
     "extra_debug_asserts"
@@ -78,8 +80,10 @@ prost-build = "0.11.8"
 [features]
 default = []
 dynamic_linking = ["bevy/dynamic_linking"]
+export_schedule = ["bevy_mod_debugdump"]
 debug_picking = ["bevy_mod_picking/debug"]
 editor = ["bevy_editor_pls"]
+dev = ["dynamic_linking", "editor", "export_schedule"]
 # inspector = ["bevy-inspector-egui"]
 
 # Enable max optimizations for dependencies, but not for our code:

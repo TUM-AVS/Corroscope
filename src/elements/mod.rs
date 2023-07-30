@@ -17,7 +17,6 @@ impl Plugin for ElementsPlugin {
             .add_systems(Update, trajectory::trajectory_visibility)
             .add_systems(Update, trajectory::trajectory_tooltip)
             .add_systems(Update, trajectory::trajectory_window)
-            .add_systems(Update, trajectory::update_selected_color)
             // .add_systems(Update, obstacle::plot_obs)
             .add_systems(Update, obstacle::obstacle_tooltip)
             .add_systems(Update, obstacle::trajectory_animation);

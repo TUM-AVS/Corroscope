@@ -1555,6 +1555,7 @@ dependencies = [
  "bevy_editor_pls",
  "bevy_egui",
  "bevy_framepace",
+ "bevy_mod_debugdump",
  "bevy_mod_picking",
  "bevy_pancam",
  "bevy_prototype_lyon",

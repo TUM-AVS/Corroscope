@@ -338,6 +338,9 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
         closed: false,
     };
 
+    let selected_color = traj.selected_color();
+    let normal_color = traj.color();
+
     Some((
         Name::new(format!("trajectory {}", traj.trajectory_number)),
         traj.to_owned(),
@@ -347,6 +350,10 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
             ..default()
         },
         Stroke::new(traj.color(), 0.05),
+
+        On::<Pointer<Select>>::target_insert(Stroke::new(selected_color, 0.05)),
+        On::<Pointer<Deselect>>::target_insert(Stroke::new(normal_color, 0.05)),
+
         On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
             commands.insert(HoveredTrajectory);
         }),
@@ -358,7 +365,8 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
     ))
 }
 
-fn make_main_trajectory_bundle(main_trajectories: &Vec<MainLog>) -> (MainTrajectory, impl Bundle) {
+
+fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory, impl Bundle) {
     let mpoints = main_trajectories
         .iter()
         .map(|traj| traj.kinematic_data.positions().next())
@@ -372,7 +380,7 @@ fn make_main_trajectory_bundle(main_trajectories: &Vec<MainLog>) -> (MainTraject
 
     let mtraj = MainTrajectory {
         path: mpoints,
-        kinematic_data: reassemble_main_trajectory(&main_trajectories),
+        kinematic_data: reassemble_main_trajectory(main_trajectories),
     };
 
     (
@@ -553,13 +561,13 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
 pub(crate) fn trajectory_group_visibility(
     mut trajectory_q: Query<(&TrajectoryGroup, &mut Visibility)>,
 
-    cts: Res<CurrentTimeStep>,
+    time_step: Res<crate::global_settings::TimeStep>,
 ) {
-    let time_step = cts.dynamic_time_step.round() as i32;
-
-    if !cts.is_changed() {
+    if !time_step.is_changed() {
         return;
     }
+    let time_step = time_step.time_step;
+    bevy::log::info!("updating group visibility");
 
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.time_step == time_step {
@@ -578,6 +586,8 @@ pub fn trajectory_visibility(
     if !settings.is_changed() {
         return;
     }
+
+    bevy::log::info!("updating traj visibility");
 
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.feasible || settings.show_infeasible {
@@ -647,18 +657,6 @@ pub fn trajectory_tooltip(
             }
         },
     );
-}
-
-pub fn update_selected_color(
-    mut trajectory_q: Query<(&TrajectoryLog, &PickSelection, &mut Stroke), Changed<PickSelection>>,
-) {
-    for (traj, selected, mut stroke) in trajectory_q.iter_mut() {
-        if selected.is_selected {
-            stroke.color = traj.selected_color();
-        } else {
-            stroke.color = traj.color();
-        }
-    }
 }
 
 pub fn trajectory_window(
