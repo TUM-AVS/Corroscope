@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, cell::RefCell};
 
 use bevy::prelude::*;
 
@@ -21,7 +21,7 @@ pub struct MainTrajectory {
     kinematic_data: KinematicData,
 }
 
-#[derive(Component)]
+#[derive(Component, Default, Copy, Clone)]
 pub struct HoveredTrajectory;
 
 fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
@@ -120,12 +120,8 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<impl Bundle> {
         },
         On::<Pointer<Select>>::target_insert(Stroke::new(selected_color, 0.02)),
         On::<Pointer<Deselect>>::target_insert(Stroke::new(normal_color, 0.02)),
-        On::<Pointer<Over>>::target_commands_mut(|_click, commands| {
-            commands.insert(HoveredTrajectory);
-        }),
-        On::<Pointer<Out>>::target_commands_mut(|_click, commands| {
-            commands.remove::<HoveredTrajectory>();
-        }),
+        On::<Pointer<Over>>::target_insert(HoveredTrajectory),
+        On::<Pointer<Out>>::target_remove::<HoveredTrajectory>(),
         PickableBundle::default(),
         RaycastPickTarget::default(),
     ))
@@ -270,7 +266,7 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
 
     drop(sender);
 
-    let inserter = io_pool.scope(|s| {
+    let _inserter = io_pool.scope(|s| {
         s.spawn({
             async move {
                 let mut ts_map = BTreeMap::new();
@@ -324,8 +320,11 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
 }
 
 pub(crate) fn trajectory_group_visibility(
+    mut commands: Commands,
+
     mut trajectory_q: Query<(&TrajectoryGroup, &mut Visibility)>,
 
+    // trajectory_child_q: Query<&TrajectoryLog>,
     time_step: Res<crate::global_settings::TimeStep>,
 ) {
     if !time_step.is_changed() {
@@ -337,8 +336,17 @@ pub(crate) fn trajectory_group_visibility(
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.time_step == time_step {
             *visibility = Visibility::Visible;
+            // for child in children.iter() {
+            //     let ecommands = commands.entity(*child);
+            //     let color = trajectory_child_q.get(*child).unwrap().color();
+            //     commands.entity(*child).insert(Stroke::new(color, 0.02));
+            // }
         } else {
             *visibility = Visibility::Hidden;
+
+            // for child in children.iter() {
+            //     commands.entity(*child).remove::<Stroke>();
+            // }
         }
     }
 }
@@ -429,80 +437,304 @@ fn trajectory_description(
     traj: &TrajectoryLog,
     plot_data: plot::TrajectoryPlotData,
     time_step: f32,
-) -> Option<f64> {
+    issues_detected: bool,
+) -> (bool, Option<f64>) {
+    let mut xcursor = None;
+
+    let mut issues_detected = std::cell::RefCell::new(issues_detected);
+
+
+    macro_rules! rich_label_base {
+        ($val:ident, $fmt:expr) => {
+            if $val.is_nan() {
+                *issues_detected.borrow_mut() = true;
+                egui::RichText::new("NaN").color(egui::Color32::LIGHT_RED)
+            } else if $val.is_infinite() {
+                *issues_detected.borrow_mut() = true;
+                egui::RichText::new($val.to_string()).color(egui::Color32::LIGHT_RED)
+            } else {
+                egui::RichText::new(format!($fmt, $val)).monospace()
+            }
+        };
+    }
+
+    macro_rules! rich_label {
+        ($ui:ident, $val:expr, $fmt:expr) => {
+            let val: f64 = $val;
+            let text: egui::RichText = rich_label_base!(val, $fmt);
+
+            let resp = $ui.label(text);
+            resp.on_hover_text(val.to_string());
+        };
+        ($ui:ident, $val:expr, $fmt:expr, $weak_th:expr) => {
+            let val: f64 = $val;
+            let base_text: egui::RichText = rich_label_base!(val, $fmt);
+            let text = if val < $weak_th {
+                base_text.weak()
+            } else {
+                base_text
+            };
+
+            let resp = $ui.label(text);
+            resp.on_hover_text(val.to_string());
+        };
+    }
+
+
+    let value_cell_layout = egui::Layout::left_to_right(egui::Align::Center)
+        .with_main_align(egui::Align::Max)
+        .with_main_justify(true);
+
+    ui.horizontal_top(|ui| {
     ui.label(
-        egui::RichText::new(format!("Trajectory {}", traj.trajectory_number))
-            .heading()
-            .size(30.0),
+        egui::RichText::new(format!(
+            "Trajectory {} (id: {})",
+            traj.trajectory_number, traj.unique_id
+        ))
+        .heading()
+        .size(26.0),
     );
-    // ui.label(format!("type: {:#?}", obs.obstacle_type()));
+
+        if *issues_detected.borrow() {
+            let resp = ui.label(egui::RichText::new("\u{26A0}").heading().size(24.0).color(egui::Color32::YELLOW));
+            resp.on_hover_text("Some values (e.g. computed costs) for this trajectory are invalid because they are NaN or infinity");
+        }
+    });
 
     ui.heading("Overview");
-    ui.label(format!("feasible: {}", traj.feasible));
+    ui.horizontal_top(|ui| {
+        ui.label("feasible:");
+        ui.label(egui::RichText::new(traj.feasible.to_string()).strong());
+    });
 
-    let resp = ui.label(format!("total cost: {:.3}", traj.costs_cumulative_weighted));
-    resp.on_hover_text(traj.costs_cumulative_weighted.to_string());
-    // ui.label(format!("collision cost: {}", traj.costs.prediction_cost));
+    ui.horizontal_top(|ui| {
+        ui.label("total cost:");
+        rich_label!(ui, traj.costs_cumulative_weighted, "{:.3}");
+    });
 
-    ui.separator();
+    let overview_left = |ui: &mut egui::Ui| {
+        ui.label("final position:");
+        ui.indent("curvilinear position", |ui| {
+            ui.horizontal_top(|ui| {
+                ui.vertical(|ui| {
+                    ui.label("longitudinal:");
+                    ui.label("lateral:");
+                });
+                ui.vertical(|ui| {
+                    rich_label!(ui, traj.s_position_m, "{:>8.3}");
+                    rich_label!(ui, traj.d_position_m, "{:>8.3}");
+                    //ui.label(format!("{:>8.2}", traj.s_position_m));
+                    //ui.label(format!("{:>8.2}", traj.d_position_m));
+                });
+            });
+        });
+
+        match (traj.ego_risk, traj.obst_risk) {
+            (Some(ego_risk), Some(obst_risk)) => {
+                ui.horizontal_top(|ui| {
+                    ui.label("ego risk:");
+                    rich_label!(ui, ego_risk, "{:.3}");
+                });
+                ui.horizontal_top(|ui| {
+                    ui.label("obst risk:");
+                    rich_label!(ui, obst_risk, "{:.3}");
+                });
+            }
+            _ => {}
+        };
+    };
 
     use egui_extras::{Column, TableBuilder};
-    TableBuilder::new(ui)
-        .cell_layout(egui::Layout {
-            main_align: egui::Align::Max,
-            ..default()
-        })
-        .striped(true)
-        .column(Column::initial(250.0).resizable(true))
-        .column(Column::exact(70.0))
-        .header(25.0, |mut header| {
-            header.col(|ui| {
-                ui.heading("Cost name");
-            });
-            header.col(|ui| {
-                ui.heading("Value");
-            });
-        })
-        .body(|mut body| {
-            for (k, v) in traj.sorted_nonzero_costs() {
-                body.row(18.0, |mut row| {
-                    row.col(|ui| {
-                        ui.label(egui::RichText::new(k).monospace());
+    let overview_right = |ui: &mut egui::Ui| {
+        ui.push_id("overview table", |ui| {
+            TableBuilder::new(ui)
+                .column(Column::auto())
+                .column(Column::initial(50.0))
+                .body(|mut body| {
+                    body.row(15.0, |mut row| {
+                        row.col(|ui| {
+                            let resp = ui.label("dt:");
+                            resp.on_hover_text("time step size");
+                        });
+                        row.col(|ui| {
+                            ui.with_layout(value_cell_layout, |ui| {
+                                rich_label!(ui, traj.dt, "{}s");
+                            });
+                        });
                     });
-                    row.col(|ui| {
-                        let layout = egui::Layout::left_to_right(egui::Align::Center)
-                            .with_main_align(egui::Align::Max)
-                            .with_main_justify(true);
-                        ui.with_layout(layout, |ui| {
-                            let resp = ui.label(format!("{:>7.3}", v));
-                            resp.on_hover_text(v.to_string());
+                    body.row(15.0, |mut row| {
+                        row.col(|ui| {
+                            ui.label("horizon:");
+                        });
+                        row.col(|ui| {
+                            ui.with_layout(value_cell_layout, |ui| {
+                                rich_label!(ui, traj.horizon, "{}s");
+                            });
+                        });
+                    });
+                    body.row(15.0, |mut row| {
+                        row.col(|ui| {
+                            ui.label("trajectory length:");
+                        });
+                        row.col(|ui| {
+                            ui.with_layout(value_cell_layout, |ui| {
+                                rich_label!(ui, traj.actual_traj_length, "{}m");
+                            });
                         });
                     });
                 });
-            }
+        });
+    };
+    egui_extras::StripBuilder::new(ui)
+        .size(egui_extras::Size::initial(70.0))
+        .size(egui_extras::Size::remainder())
+        .vertical(|mut strip| {
+            strip.strip(|builder| {
+                builder
+                    .size(egui_extras::Size::relative(0.5))
+                    .size(egui_extras::Size::relative(0.5))
+                    .horizontal(|mut strip| {
+                        strip.cell(overview_left);
+                        strip.cell(overview_right);
+                    });
+            });
+            strip.cell(|ui| {
+                // let resp = ui.label(format!("total cost: {:.3}", traj.costs_cumulative_weighted));
+                //resp.on_hover_text(traj.costs_cumulative_weighted.to_string());
+
+                ui.separator();
+
+                ui.heading("Costs");
+
+                let hide_small_costs_id = ui.make_persistent_id("hide small costs");
+                let cost_threshold_id = ui.make_persistent_id("cost map threshold");
+
+                let mut hide_small_costs =
+                    ui.data_mut(|itm| *itm.get_persisted_mut_or::<bool>(hide_small_costs_id, true));
+                let mut cost_threshold =
+                    ui.data_mut(|itm| *itm.get_persisted_mut_or::<f64>(cost_threshold_id, 1e-3));
+
+                ui.checkbox(&mut hide_small_costs, "Hide small cost functions");
+                ui.add_enabled_ui(hide_small_costs, |ui| {
+                    ui.indent("cost threshold section", |ui| {
+                        ui.add(
+                            egui::Slider::new(&mut cost_threshold, 1e-4..=1e1)
+                                .logarithmic(true)
+                                .text("cost display threshold"),
+                        );
+                    });
+                });
+
+                // bevy::log::debug!("writing hide value: {}", hide_small_costs);
+
+                ui.data_mut(|itm| itm.insert_persisted(hide_small_costs_id, hide_small_costs));
+                ui.data_mut(|itm| itm.insert_persisted(cost_threshold_id, cost_threshold));
+
+                ui.add_space(5.0);
+
+                ui.push_id("cost table", |ui| {
+                    TableBuilder::new(ui)
+                        .striped(true)
+                        .column(Column::exact(300.0).resizable(true))
+                        .column(Column::remainder())
+                        .header(25.0, |mut header| {
+                            header.col(|ui| {
+                                ui.label(
+                                    egui::RichText::new("Cost Function Name")
+                                        .heading()
+                                        .size(14.0),
+                                );
+                            });
+                            header.col(|ui| {
+                                ui.label(egui::RichText::new("Value").heading().size(14.0));
+                            });
+                        })
+                        .body(|mut body| {
+                            for (k, v) in traj.sorted_nonzero_costs(if hide_small_costs {
+                                Some(cost_threshold)
+                            } else {
+                                None
+                            }) {
+                                body.row(18.0, |mut row| {
+                                    row.col(|ui| {
+                                        ui.monospace(k);
+                                    });
+                                    row.col(|ui| {
+                                        ui.with_layout(value_cell_layout, |ui| {
+                                            rich_label!(
+                                                ui,
+                                                v,
+                                                "{:>7.3}",
+                                                traj.costs_cumulative_weighted * 0.05
+                                            );
+                                        });
+                                    });
+                                });
+                            }
+                        });
+                });
+
+                ui.add_space(10.0);
+
+                ui.heading("Feasability");
+
+                ui.push_id("feasability table", |ui| {
+                    TableBuilder::new(ui)
+                        .striped(true)
+                        .column(Column::exact(300.0).resizable(true))
+                        .column(Column::remainder())
+                        .header(25.0, |mut header| {
+                            header.col(|ui| {
+                                ui.label(egui::RichText::new("Check Name").heading().size(14.0));
+                            });
+                            header.col(|ui| {
+                                let resp = ui.label(
+                                    egui::RichText::new("Violated Count").heading().size(14.0),
+                                );
+                                resp.on_hover_text(
+                        "Number of time steps in which this feasability check was violated",
+                    );
+                            });
+                        })
+                        .body(|mut body| {
+                            macro_rules! inf_row {
+                                ($inf_name:ident) => {
+                                    body.row(18.0, |mut row| {
+                                        row.col(|ui| {
+                                            ui.monospace(std::stringify!($inf_name));
+                                        });
+                                        row.col(|ui| {
+                                            ui.with_layout(value_cell_layout, |ui| {
+                                                let resp = ui
+                                                    .monospace(format!("{:>5.0}", traj.$inf_name));
+                                                resp.on_hover_text(traj.$inf_name.to_string());
+                                            });
+                                        });
+                                    });
+                                };
+                            }
+                            inf_row!(inf_kin_yaw_rate);
+                            inf_row!(inf_kin_acceleration);
+                            inf_row!(inf_kin_max_curvature);
+                        });
+                });
+
+                ui.separator();
+
+                xcursor = plot::plot_traj(plot_data, ui, time_step)
+            });
         });
 
-    ui.separator();
+    (issues_detected.take(), xcursor)
+}
 
-    ui.group(|ui| {
-        ui.label(format!("inf_kin_yaw_rate: {}", traj.inf_kin_yaw_rate));
-        ui.label(format!(
-            "inf_kin_acceleration: {}",
-            traj.inf_kin_acceleration
-        ));
-        ui.label(format!(
-            "inf_kin_max_curvature: {}",
-            traj.inf_kin_max_curvature
-        ));
-        //ui.label(format!(
-        //    "inf_kin_max_curvature_rate: {}",
-        //    traj.inf_kin_max_curvature_rate
-        //));
-    });
+// #[derive(Resource)]
+pub(crate) struct IssuesDetected(bool);
 
-    ui.separator();
-
-    plot::plot_traj(plot_data, ui, time_step)
+impl Default for IssuesDetected {
+    fn default() -> Self {
+        Self(false)
+    }
 }
 
 pub(crate) fn trajectory_window(
@@ -517,6 +749,8 @@ pub(crate) fn trajectory_window(
     mtraj: Res<MainTrajectory>,
 
     mut cached_plot_data: Local<Option<plot::CachedTrajectoryPlotData>>,
+
+    mut issues_detected: Local<IssuesDetected>,
 ) {
     let ctx = contexts.ctx_mut();
 
@@ -530,13 +764,18 @@ pub(crate) fn trajectory_window(
     let panel_id = egui::Id::new("side panel trajectory right");
     egui::SidePanel::right(panel_id)
         .exact_width(500.0)
+        // .frame(egui::Frame::side_top_panel(ctx.style()).inner_margin
         .show(ctx, |ui| {
-            ui.set_max_width(440.0);
+            // ui.set_max_width(440.0);
             egui::ScrollArea::vertical()
-                .max_width(440.0)
+                .max_width(500.0 - ctx.style().spacing.scroll_bar_width - 8.0)
+                .scroll_bar_visibility(
+                    egui::containers::scroll_area::ScrollBarVisibility::AlwaysVisible,
+                )
                 .show(ui, |ui| {
                     let Some((entity, traj)) = selected_traj else {
                         *cached_plot_data = None;
+                        *issues_detected = IssuesDetected(false);
                         return;
                     };
 
@@ -564,8 +803,9 @@ pub(crate) fn trajectory_window(
 
                     let plot_data = plot::TrajectoryPlotData::from_data(cplot_data);
 
-                    let xcursor =
-                        trajectory_description(ui, traj, plot_data, cts.dynamic_time_step.round());
+                    let (new_issues_detected, xcursor) =
+                        trajectory_description(ui, traj, plot_data, cts.dynamic_time_step.round(), issues_detected.0);
+                    *issues_detected = IssuesDetected(new_issues_detected);
 
                     // TODO: Fix remaining trajectory cursor issues
                     let enable_trajectory_cursor = false;

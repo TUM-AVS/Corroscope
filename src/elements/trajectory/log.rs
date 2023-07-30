@@ -146,10 +146,11 @@ impl TrajectoryLog {
                     40,
                 )
             } else {
-                let unit_cost = self.costs_cumulative_weighted / 20.0;
+                let max_cost = 20.0;
+                let unit_cost = self.costs_cumulative_weighted / max_cost;
                 let cost_val = 37.0 + (unit_cost.fract() * 360.0);
-                let c = Color::hsla(cost_val as f32, 0.7, 0.8, 0.4);
-                bevy::log::debug!("color={:?}", c);
+                let c = Color::hsla(cost_val as f32, 0.7, 0.7, 0.4);
+                bevy::log::trace!("color={:?}", c);
                 c
             }
         } else {
@@ -159,7 +160,7 @@ impl TrajectoryLog {
 
     pub(crate) fn selected_color(&self) -> Color {
         let base_color = self.color().as_hsla();
-        base_color + Color::hsla(0.0, 0.1, 0.3, 0.2)
+        base_color + Color::hsla(0.0, 0.1, 0.15, 0.2)
     }
 
     pub(crate) fn velocity_plot_data(&self) -> Vec<[f64; 2]> {
@@ -185,17 +186,32 @@ impl TrajectoryLog {
             .curvilinear_orientation_plot_data(Some(self.time_step))
     }
 
-    pub(crate) fn sorted_nonzero_costs<'a>(&'a self) -> impl Iterator<Item = (&'a str, f64)> {
-        let mut cost_values = self
+    pub(crate) fn sorted_nonzero_costs<'a>(
+        &'a self,
+        cost_threshold: Option<f64>,
+    ) -> impl IntoIterator<Item = (&'a str, f64)> {
+        let (mut valid, invalid): (Vec<_>, Vec<_>) = self
             .costs
             .iter()
             .map(|(k, v)| (k.as_str(), *v))
-            .filter(|(_k, v)| *v > 1e-3)
-            .collect::<Vec<(_, f64)>>();
+            .filter(|(_k, v)| {
+                if v.is_finite() {
+                    if let Some(th) = cost_threshold {
+                        *v > th
+                    } else {
+                        true
+                    }
+                } else {
+                    true
+                }
+            })
+            .partition(|(k, v)| v.is_finite());
 
-        cost_values.sort_by(|(_k1, v1), (_k2, v2)| v1.partial_cmp(v2).unwrap());
+        valid.sort_by(|(_k1, v1), (_k2, v2)| v1.partial_cmp(v2).unwrap().reverse());
 
-        cost_values.into_iter().rev()
+        valid.extend(invalid.into_iter());
+
+        valid
     }
 }
 

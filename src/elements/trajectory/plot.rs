@@ -73,34 +73,34 @@ impl CachedTrajectoryPlotData {
 
 impl TrajectoryPlotData {
     pub(crate) fn from_data(plot_data: CachedTrajectoryPlotData) -> Self {
-        let velocity = egui::plot::Line::new(plot_data.velocity).name("velocity");
+        let velocity = egui::plot::Line::new(plot_data.velocity).name("velocity [m/s]");
 
-        let velocity_ref = egui::plot::Line::new(plot_data.velocity_ref).name("ref velocity");
+        let velocity_ref = egui::plot::Line::new(plot_data.velocity_ref).name("reference velocity [m/s]");
 
-        let acceleration = egui::plot::Line::new(plot_data.acceleration).name("acceleration");
+        let acceleration = egui::plot::Line::new(plot_data.acceleration).name("acceleration [m/s\u{00B2}]");
 
         let acceleration_ref =
-            egui::plot::Line::new(plot_data.acceleration_ref).name("ref acceleration");
+            egui::plot::Line::new(plot_data.acceleration_ref).name("reference acceleration [m/s\u{00B2}]");
 
-        let orientation = egui::plot::Line::new(plot_data.orientation).name("orientation [rad]");
+        let orientation = egui::plot::Line::new(plot_data.orientation).name("global orientation [rad]");
 
         let orientation_ref = egui::plot::Line::new(plot_data.orientation_ref)
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
-            .name("reference orientation [rad]");
+            .name("reference global orientation [rad]");
 
         let curvilinear_orientation =
-            egui::plot::Line::new(plot_data.curvilinear_orientation).name("orientation [rad]");
+            egui::plot::Line::new(plot_data.curvilinear_orientation).name("curvilinear orientation [rad]");
 
         let curvilinear_orientation_ref =
             egui::plot::Line::new(plot_data.curvilinear_orientation_ref)
                 .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
-                .name("reference orientation [rad]");
+                .name("reference curvilinear orientation [rad]");
 
-        let kappa = egui::plot::Line::new(plot_data.kappa).name("orientation [rad]");
+        let kappa = egui::plot::Line::new(plot_data.kappa).name("curvature [1/m]");
 
         let kappa_ref = egui::plot::Line::new(plot_data.kappa_ref)
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
-            .name("reference orientation [rad]");
+            .name("reference curvature [1/m]");
 
         Self {
             velocity,
@@ -126,6 +126,8 @@ pub(crate) fn plot_traj(
 
     let group = egui::Id::new("trajectory plot group");
 
+    let plot_width = ui.available_width();
+
     let plot = |name: &'static str| {
         egui::plot::Plot::new(name)
             .legend(egui::plot::Legend::default().position(egui::plot::Corner::LeftBottom))
@@ -136,7 +138,8 @@ pub(crate) fn plot_traj(
             .sharp_grid_lines(true)
             .include_x(0.0)
             .include_y(0.0)
-            .height(250.0)
+            .width(plot_width)
+            // .height(250.0)
             .link_cursor(group, true, false)
     };
 
@@ -241,7 +244,7 @@ pub(crate) fn plot_traj(
             }
         });
 
-    ui.heading("Kappa");
+    ui.heading("Curvature");
     let _theta_plot = plot("kappa_plot")
         .center_y_axis(true)
         .label_formatter(angle_label_formatter)
