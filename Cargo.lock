@@ -1280,7 +1280,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6798148dccfbff0fae41c7574d2fa8f1ef3492fba0face179de5d8d447d67b05"
 dependencies = [
  "memchr",
- "regex-automata 0.3.3",
+ "regex-automata 0.3.4",
  "serde",
 ]
 
@@ -1808,9 +1808,9 @@ dependencies = [
 
 [[package]]
 name = "errno"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bcfec3a70f97c962c307b2d2c56e358cf1d00b558d74262b5f929ee8cc7e73a"
+checksum = "6b30f669a7961ef1631673d2766cc92f52d64f7ef354d4fe0ddfd30ed52f0f4f"
 dependencies = [
  "errno-dragonfly",
  "libc",
@@ -3132,7 +3132,7 @@ checksum = "b2eae68fc220f7cf2532e4494aded17545fce192d59cd996e0fe7887f4ceb575"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata 0.3.3",
+ "regex-automata 0.3.4",
  "regex-syntax 0.7.4",
 ]
 
@@ -3147,9 +3147,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39354c10dd07468c2e73926b23bb9c2caca74c5501e38a35da70406f1d923310"
+checksum = "b7b6d6190b7594385f61bd3911cd1be99dfddcfc365a4160cc2ab5bff4aed294"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -3252,18 +3252,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.174"
+version = "1.0.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b88756493a5bd5e5395d53baa70b194b05764ab85b59e43e4b8f4e1192fa9b1"
+checksum = "60363bdd39a7be0266a520dab25fdc9241d2f987b08a01e01f0ec6d06a981348"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.174"
+version = "1.0.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e5c3a298c7f978e53536f95a63bdc4c4a64550582f31a0359a9afda6aede62e"
+checksum = "f28482318d6641454cb273da158647922d1be6b5a2fcc6165cd89ebdd7ed576b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3272,9 +3272,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.103"
+version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d03b412469450d4404fe8499a268edd7f8b79fecb074b0d812ad64ca21f4031b"
+checksum = "076066c5f1078eac5b722a31827a8832fe108bed65dfa75e233c89f8206e976c"
 dependencies = [
  "itoa",
  "ryu",
@@ -3292,9 +3292,9 @@ dependencies = [
 
 [[package]]
 name = "simd-adler32"
-version = "0.3.5"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "238abfbb77c1915110ad968465608b68e869e0772622c9656714e73e5a1a522f"
+checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
 name = "siphasher"
@@ -3440,9 +3440,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.29.6"
+version = "0.29.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7cb97a5a85a136d84e75d5c3cf89655090602efb1be0d8d5337b7e386af2908"
+checksum = "165d6d8539689e3d3bc8b98ac59541e1f21c7de7c85d60dc80e43ae0ed2113db"
 dependencies = [
  "cfg-if",
  "core-foundation-sys",
@@ -4304,9 +4304,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.5.0"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81fac9742fd1ad1bd9643b991319f72dd031016d44b77039a26977eb667141e7"
+checksum = "8bd122eb777186e60c3fdf765a58ac76e41c582f1f535fbf3314434c6b58f3f7"
 dependencies = [
  "memchr",
 ]
