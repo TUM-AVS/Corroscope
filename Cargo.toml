@@ -2,6 +2,7 @@
 name = "corroscope"
 version = "0.1.0"
 edition = "2021"
+resolver = "2"
 
 [dependencies]
 # nalgebra = "0.32.3"
@@ -25,7 +26,6 @@ bevy_pancam = { version = "0.9", features = [ "bevy_egui" ] }
 bevy_mod_picking = { git = "https://github.com/Vrixyz/bevy_mod_picking", branch = "bevy-0.11-compatibility", default_features = false, features = [
     # "backend_egui",
     "backend_raycast",
-    "highlight",
     "selection",
     ] }
 
