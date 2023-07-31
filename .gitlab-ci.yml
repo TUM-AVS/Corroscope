@@ -23,11 +23,13 @@ image: rust:latest
 
 rust-latest:
   stage: build
+  needs: []
   script:
     - cargo --color always --locked build
 
 rust-nightly:
   stage: build
+  needs: []
   image: rustlang/rust:nightly
   script:
     - cargo --color always --locked build
@@ -35,8 +37,11 @@ rust-nightly:
 
 rust-latest-release:
   stage: build
+  needs: []
   script:
     - cargo --color always --locked build --release
+  after_script:
+    - mv target/release/corroscope .
   artifacts:
     untracked: false
     when: on_success
@@ -44,10 +49,11 @@ rust-latest-release:
     name: "corroscope-bin"
     expose_as: "Built Executable"
     paths:
-      - target/release/corroscope
+      - corroscope
 
 clippy:
   stage: lint
+  needs: []
   script:
     - rustup component add clippy
     - cargo install gitlab_clippy
