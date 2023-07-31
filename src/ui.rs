@@ -8,23 +8,19 @@ impl Plugin for SelectiveInputPlugin {
         app.init_resource::<EguiBlockInputState>()
             .add_systems(
                 PreUpdate,
-                egui_block_input
-                    .after(bevy_egui::EguiSet::ProcessInput),
+                egui_block_input.after(bevy_egui::EguiSet::ProcessInput),
             )
             .add_systems(
                 PreUpdate,
-                egui_block_picking
-                    .before(bevy_mod_picking::picking_core::PickSet::ProcessInput),
+                egui_block_picking.before(bevy_mod_picking::picking_core::PickSet::ProcessInput),
             )
             .add_systems(
                 Update,
-                egui_block_pancam
-                    .before(bevy_pancam::PanCamSystemSet),
+                egui_block_pancam.before(bevy_pancam::PanCamSystemSet),
             )
             .add_systems(
                 PostUpdate,
-                egui_wants_input
-                    .after(bevy_egui::EguiSet::ProcessOutput),
+                egui_wants_input.after(bevy_egui::EguiSet::ProcessOutput),
             );
     }
 }
@@ -88,9 +84,12 @@ fn egui_block_pancam(
 
     let pancam_enable = !state.wants_pointer_input && !state.pointer_over_area;
 
-
     for (entity, mut pancam) in &mut pancam_q {
-        bevy::log::debug!("pancam {:?}: setting picking enabled to {}", entity, pancam_enable);
+        bevy::log::debug!(
+            "pancam {:?}: setting picking enabled to {}",
+            entity,
+            pancam_enable
+        );
         pancam.enabled = pancam_enable;
     }
 }

@@ -2,13 +2,11 @@ use bevy::prelude::*;
 
 use bevy_egui::EguiContexts;
 
-
 pub struct GlobalSettingsPlugin;
 
 impl Plugin for GlobalSettingsPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .init_resource::<GlobalSettings>()
+        app.init_resource::<GlobalSettings>()
             .init_resource::<TimeStep>()
             .add_systems(Update, side_panel)
             .add_systems(Update, animate_time);

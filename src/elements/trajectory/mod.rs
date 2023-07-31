@@ -80,8 +80,8 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
         On::<Pointer<Select>>::send_event::<SelectTrajectoryEvent>(),
         // On::<Pointer<Select>>::target_insert((SelectedTrajectory, Stroke::new(selected_color, 0.02))),
         // On::<Pointer<Deselect>>::target_commands_mut(|_ptr, commands| {
-            // commands.insert(Stroke::new(normal_color, 0.02));
-            // commands.remove::<SelectedTrajectory>();
+        // commands.insert(Stroke::new(normal_color, 0.02));
+        // commands.remove::<SelectedTrajectory>();
         //}),
         On::<Pointer<Over>>::target_insert(HoveredTrajectory),
         On::<Pointer<Out>>::target_remove::<HoveredTrajectory>(),
@@ -101,7 +101,10 @@ pub(super) fn update_selected_trajectory(
 
     mut selection_events: EventReader<SelectTrajectoryEvent>,
 
-    mut trajectory_q: Query<(&TrajectoryLog, &mut Transform, &mut Visibility), Without<SelectedTrajectory>>,
+    mut trajectory_q: Query<
+        (&TrajectoryLog, &mut Transform, &mut Visibility),
+        Without<SelectedTrajectory>,
+    >,
 
     mut selected_q: Query<(Entity, &TrajectoryLog, &mut Visibility), With<SelectedTrajectory>>,
 ) {
@@ -117,7 +120,11 @@ pub(super) fn update_selected_trajectory(
         let normal_color = traj.color();
         ecommands.insert(Stroke::new(normal_color, 0.02));
 
-        *visibility = if traj.feasible { Visibility::Inherited } else { Visibility::Hidden };
+        *visibility = if traj.feasible {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     }
 
     let SelectTrajectoryEvent(entity) = selection_events.iter().last().unwrap();
@@ -707,8 +714,16 @@ fn trajectory_description(
                                         });
                                         row.col(|ui| {
                                             ui.with_layout(value_cell_layout, |ui| {
-                                                let text = egui::RichText::new(format!("{:>5.0}", traj.$inf_name)).monospace();
-                                                let resp = ui.label(if traj.$inf_name == 0.0 { text.weak() } else { text });
+                                                let text = egui::RichText::new(format!(
+                                                    "{:>5.0}",
+                                                    traj.$inf_name
+                                                ))
+                                                .monospace();
+                                                let resp = ui.label(if traj.$inf_name == 0.0 {
+                                                    text.weak()
+                                                } else {
+                                                    text
+                                                });
                                                 resp.on_hover_text(traj.$inf_name.to_string());
                                             });
                                         });
@@ -735,7 +750,14 @@ pub(crate) fn trajectory_window(
 
     mut contexts: EguiContexts,
 
-    trajectory_q: Query<(Entity, &TrajectoryLog, bevy::ecs::query::Has<HasInvalidData>), With<SelectedTrajectory>>,
+    trajectory_q: Query<
+        (
+            Entity,
+            &TrajectoryLog,
+            bevy::ecs::query::Has<HasInvalidData>,
+        ),
+        With<SelectedTrajectory>,
+    >,
 
     cts: Res<CurrentTimeStep>,
 
@@ -744,7 +766,6 @@ pub(crate) fn trajectory_window(
     mut cached_plot_data: Local<Option<std::sync::Arc<plot::CachedTrajectoryPlotData>>>,
 ) {
     let ctx = contexts.ctx_mut();
-
 
     let panel_id = egui::Id::new("side panel trajectory right");
     egui::SidePanel::right(panel_id)
@@ -769,8 +790,11 @@ pub(crate) fn trajectory_window(
                     let mut new_data = cached_plot_data
                         .take()
                         .filter(|data| data.matches_trajectory(traj));
-                    let cplot_data1 = new_data
-                        .get_or_insert_with(|| std::sync::Arc::new(plot::CachedTrajectoryPlotData::from_trajectory(&mtraj, traj)));
+                    let cplot_data1 = new_data.get_or_insert_with(|| {
+                        std::sync::Arc::new(plot::CachedTrajectoryPlotData::from_trajectory(
+                            &mtraj, traj,
+                        ))
+                    });
 
                     let plot_data = plot::TrajectoryPlotData::from_data(cplot_data1);
 
@@ -832,7 +856,6 @@ pub(crate) fn trajectory_window(
                 });
         });
 }
-
 
 macro_rules! rich_label_base {
     ($val:ident, $fmt:expr) => {
@@ -900,10 +923,8 @@ impl SortDirection {
 use crate::finite::{Finite, Finite32};
 
 impl TrajectoryLog {
-
     fn max_deviation(&self) -> Finite32 {
-        self
-            .kinematic_data
+        self.kinematic_data
             .curvilinear_orientations_rad
             .iter()
             .map(|v| v.abs().try_into().unwrap())
@@ -913,8 +934,7 @@ impl TrajectoryLog {
     }
 
     fn final_velocity(&self) -> Finite32 {
-        self
-            .kinematic_data
+        self.kinematic_data
             .velocities_mps
             .iter()
             .last()
@@ -925,13 +945,16 @@ impl TrajectoryLog {
     }
 }
 
-
 pub(crate) fn trajectory_list(
     mut contexts: EguiContexts,
 
     selected_q: Query<Entity, Added<SelectedTrajectory>>,
 
-    trajectory_q: Query<(&TrajectoryLog, bevy::ecs::query::Has<SelectedTrajectory>, bevy::ecs::query::Has<HasInvalidData>)>,
+    trajectory_q: Query<(
+        &TrajectoryLog,
+        bevy::ecs::query::Has<SelectedTrajectory>,
+        bevy::ecs::query::Has<HasInvalidData>,
+    )>,
 
     mut group_q: Query<&mut Children, With<CurrentTrajectoryGroup>>,
 
@@ -952,28 +975,16 @@ pub(crate) fn trajectory_list(
         let (traj, _selected, _invalid_data) = trajectory_q.get(*entity).unwrap();
 
         let val = match *sort_key {
-            TrajectorySortKey::ID => {
-                Finite::from(traj.unique_id)
-            },
-            TrajectorySortKey::MaxCurvilinearDeviation => {
-                traj.max_deviation()
-            },
-            TrajectorySortKey::FinalVelocity => {
-                traj.final_velocity()
-            },
-            TrajectorySortKey::Cost => {
-                (traj.costs_cumulative_weighted as f32)
-                    .try_into()
-                    .unwrap_or(Finite::MAX)
-            },
+            TrajectorySortKey::ID => Finite::from(traj.unique_id),
+            TrajectorySortKey::MaxCurvilinearDeviation => traj.max_deviation(),
+            TrajectorySortKey::FinalVelocity => traj.final_velocity(),
+            TrajectorySortKey::Cost => (traj.costs_cumulative_weighted as f32)
+                .try_into()
+                .unwrap_or(Finite::MAX),
         };
         match *sort_dir {
-            SortDirection::Ascending => {
-                val
-            },
-            SortDirection::Descending => {
-                -val
-            },
+            SortDirection::Ascending => val,
+            SortDirection::Descending => -val,
         }
     };
     children.sort_by_cached_key(key);
@@ -981,11 +992,7 @@ pub(crate) fn trajectory_list(
     let selected_idx = selected_q
         .get_single()
         .ok()
-        .and_then(|selected| {
-            children
-                .iter()
-                .position(|entity| *entity == selected)
-        });
+        .and_then(|selected| children.iter().position(|entity| *entity == selected));
 
     let value_cell_layout = egui::Layout::left_to_right(egui::Align::Center)
         .with_main_align(egui::Align::Max)

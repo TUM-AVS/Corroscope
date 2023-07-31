@@ -115,7 +115,8 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
 }
 
 pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
-    let _span = bevy::log::info_span!("spawning lanelet", lanelet_id = lanelet.lanelet_id).entered();
+    let _span =
+        bevy::log::info_span!("spawning lanelet", lanelet_id = lanelet.lanelet_id).entered();
 
     if let Some(stop_line) = &lanelet.stop_line {
         let stop_line_shape: shapes::Polygon = bevy_prototype_lyon::shapes::Polygon {

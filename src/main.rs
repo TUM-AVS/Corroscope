@@ -41,8 +41,7 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     let mut app = App::new();
 
-    app
-        .insert_resource(cr)
+    app.insert_resource(cr)
         .insert_resource(args)
         .insert_resource(bevy::winit::WinitSettings::desktop_app())
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -63,8 +62,7 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_plugins(FrameTimeDiagnosticsPlugin);
 
     // Rendering
-    app
-        .insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
+    app.insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
         .insert_resource(Msaa::Sample4)
         .add_plugins(bevy_framepace::FramepacePlugin)
         .add_plugins(bevy_egui::EguiPlugin)
@@ -73,15 +71,14 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_systems(Startup, (camera_setup, update_ui_scale_factor));
 
     // Picking
-    app
-        .add_plugins(DefaultPickingPlugins)
-        .insert_resource(bevy_mod_picking::selection::SelectionSettings {
+    app.add_plugins(DefaultPickingPlugins).insert_resource(
+        bevy_mod_picking::selection::SelectionSettings {
             click_nothing_deselect_all: true,
             use_multiselect_default_inputs: false,
-        });
+        },
+    );
 
-    app
-        .add_plugins(global_settings::GlobalSettingsPlugin)
+    app.add_plugins(global_settings::GlobalSettingsPlugin)
         .add_plugins(elements::ElementsPlugin)
         .add_plugins(ui::SelectiveInputPlugin);
 
@@ -132,7 +129,7 @@ fn export_dot(app: &mut App) -> Result<(), std::io::Error> {
 
     {
         let settings = bevy_mod_debugdump::render_graph::Settings::default();
-        let dot = bevy_mod_debugdump::render_graph_dot( app, &settings);
+        let dot = bevy_mod_debugdump::render_graph_dot(app, &settings);
         let mut dot_file = std::fs::File::create("bevy_render.dot")?;
         dot_file.write_all(dot.as_bytes())?;
     }

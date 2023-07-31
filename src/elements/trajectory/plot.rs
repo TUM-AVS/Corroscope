@@ -35,8 +35,8 @@ pub struct CachedTrajectoryPlotData {
 impl CachedTrajectoryPlotData {
     pub(crate) fn matches_trajectory(&self, traj: &super::TrajectoryLog) -> bool {
         self.time_step == traj.time_step
-                                && self.trajectory_number == traj.trajectory_number
-                                && self.unique_id == traj.unique_id
+            && self.trajectory_number == traj.trajectory_number
+            && self.unique_id == traj.unique_id
     }
 
     pub(crate) fn from_trajectory(
@@ -84,8 +84,8 @@ impl TrajectoryPlotData {
         let velocity_ref =
             egui::plot::Line::new(plot_data.velocity_ref.clone()).name("reference velocity [m/s]");
 
-        let acceleration =
-            egui::plot::Line::new(plot_data.acceleration.clone()).name("acceleration [m/s\u{00B2}]");
+        let acceleration = egui::plot::Line::new(plot_data.acceleration.clone())
+            .name("acceleration [m/s\u{00B2}]");
 
         let acceleration_ref = egui::plot::Line::new(plot_data.acceleration_ref.clone())
             .name("reference acceleration [m/s\u{00B2}]");
@@ -97,8 +97,9 @@ impl TrajectoryPlotData {
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
             .name("reference global orientation [rad]");
 
-        let curvilinear_orientation = egui::plot::Line::new(plot_data.curvilinear_orientation.clone())
-            .name("curvilinear orientation [rad]");
+        let curvilinear_orientation =
+            egui::plot::Line::new(plot_data.curvilinear_orientation.clone())
+                .name("curvilinear orientation [rad]");
 
         let curvilinear_orientation_ref =
             egui::plot::Line::new(plot_data.curvilinear_orientation_ref.clone())

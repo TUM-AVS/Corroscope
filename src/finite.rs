@@ -10,7 +10,9 @@ impl Finite<f32> {
     pub fn value(x: f32) -> Finite<f32> {
         match Self::try_value(x) {
             Some(x) => x,
-            None => { panic!("tried to pass non-finite value to Finite::value"); },
+            None => {
+                panic!("tried to pass non-finite value to Finite::value");
+            }
         }
     }
 
@@ -91,8 +93,7 @@ impl TryFrom<f64> for Finite<f64> {
     }
 }
 
-impl<Floating: std::ops::Neg> std::ops::Neg for Finite<Floating>
-{
+impl<Floating: std::ops::Neg> std::ops::Neg for Finite<Floating> {
     type Output = Finite<<Floating as std::ops::Neg>::Output>;
 
     fn neg(self) -> Self::Output {
