@@ -34,10 +34,9 @@ pub struct CachedTrajectoryPlotData {
 
 impl CachedTrajectoryPlotData {
     pub(crate) fn matches_trajectory(&self, traj: &super::TrajectoryLog) -> bool {
-        return
         self.time_step == traj.time_step
                                 && self.trajectory_number == traj.trajectory_number
-                                && self.unique_id == traj.unique_id;
+                                && self.unique_id == traj.unique_id
     }
 
     pub(crate) fn from_trajectory(

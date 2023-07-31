@@ -280,6 +280,7 @@ pub(crate) fn read_main_log(
     Ok(res)
 }
 
+#[allow(unused)]
 #[derive(Resource)]
 pub struct MainTrajectory {
     path: Vec<Vec2>,
@@ -292,11 +293,11 @@ pub struct HoveredTrajectory;
 pub(crate) fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
     let x_positions_m = mtraj
         .iter()
-        .map(|traj| traj.x_position_vehicle_m as f32)
+        .map(|traj| traj.x_position_vehicle_m)
         .collect::<Vec<f32>>();
     let y_positions_m = mtraj
         .iter()
-        .map(|traj| traj.y_position_vehicle_m as f32)
+        .map(|traj| traj.y_position_vehicle_m)
         .collect::<Vec<f32>>();
 
     let velocities_mps = mtraj

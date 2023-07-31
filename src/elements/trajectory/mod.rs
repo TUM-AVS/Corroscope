@@ -730,15 +730,6 @@ fn trajectory_description(
     (issues_detected.take(), xcursor)
 }
 
-// #[derive(Resource)]
-pub(crate) struct IssuesDetected(bool);
-
-impl Default for IssuesDetected {
-    fn default() -> Self {
-        Self(false)
-    }
-}
-
 pub(crate) fn trajectory_window(
     mut commands: Commands,
 
