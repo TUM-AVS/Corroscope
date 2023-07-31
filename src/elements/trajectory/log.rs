@@ -67,7 +67,7 @@ pub(crate) struct KinematicData {
 impl KinematicData {
     pub(crate) fn positions(&self) -> impl Iterator<Item = Vec2> + '_ {
         std::iter::zip(self.x_positions_m.as_slice(), self.y_positions_m.as_slice())
-            .map(|(&x, &y)| Vec2::new(x as f32, y as f32))
+            .map(|(&x, &y)| Vec2::new(x, y))
     }
 
     fn make_plot_data(data: &[f32], shift: Option<i32>) -> Vec<[f64; 2]> {
@@ -205,7 +205,7 @@ impl TrajectoryLog {
                     true
                 }
             })
-            .partition(|(k, v)| v.is_finite());
+            .partition(|(_k, v)| v.is_finite());
 
         valid.sort_by(|(_k1, v1), (_k2, v2)| v1.partial_cmp(v2).unwrap().reverse());
 
@@ -252,6 +252,7 @@ pub struct MainLog {
     pub(crate) costs: Costs,
 }
 
+#[allow(unused)]
 pub(crate) fn read_log(
     path: &std::path::Path,
 ) -> Result<Vec<TrajectoryLog>, Box<dyn std::error::Error>> {
@@ -288,7 +289,7 @@ pub struct MainTrajectory {
 #[derive(Component)]
 pub struct HoveredTrajectory;
 
-fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
+pub(crate) fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
     let x_positions_m = mtraj
         .iter()
         .map(|traj| traj.x_position_vehicle_m as f32)

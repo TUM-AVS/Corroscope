@@ -276,6 +276,7 @@ pub fn trajectory_animation(
     }
 }
 
+#[allow(unused)]
 pub fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
     let ctx = contexts.ctx_mut();
 

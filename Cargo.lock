@@ -1554,6 +1554,7 @@ dependencies = [
  "bevy-inspector-egui",
  "bevy_editor_pls",
  "bevy_egui",
+ "bevy_eventlistener",
  "bevy_framepace",
  "bevy_mod_debugdump",
  "bevy_mod_picking",

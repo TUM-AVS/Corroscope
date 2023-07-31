@@ -26,7 +26,18 @@ pub fn ref_path_tooltip(mut contexts: bevy_egui::EguiContexts, ref_path_q: Query
 fn read_ref_path(path: &std::path::Path) -> Result<RefPath, Box<dyn std::error::Error>> {
     let file = std::fs::File::open(path).unwrap();
 
-    let data = serde_json::from_reader(file).unwrap();
+    let data: RefPath = serde_json::from_reader(file).unwrap();
+
+    for window in data.points.as_slice().windows(2) {
+        let [w1, w2] = window else { unreachable!() };
+
+        let v1 = glam::f64::DVec2::from(*w1);
+        let v2 = glam::f64::DVec2::from(*w2);
+
+        let diff = v1.distance(v2);
+
+        bevy::log::debug!("dist={:>7.3} v1={} v2={}", diff, v1, v2);
+    }
 
     Ok(data)
 }

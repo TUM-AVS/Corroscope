@@ -33,6 +33,13 @@ pub struct CachedTrajectoryPlotData {
 }
 
 impl CachedTrajectoryPlotData {
+    pub(crate) fn matches_trajectory(&self, traj: &super::TrajectoryLog) -> bool {
+        return
+        self.time_step == traj.time_step
+                                && self.trajectory_number == traj.trajectory_number
+                                && self.unique_id == traj.unique_id;
+    }
+
     pub(crate) fn from_trajectory(
         mtraj: &super::MainTrajectory,
         traj: &super::TrajectoryLog,
@@ -72,33 +79,36 @@ impl CachedTrajectoryPlotData {
 }
 
 impl TrajectoryPlotData {
-    pub(crate) fn from_data(plot_data: CachedTrajectoryPlotData) -> Self {
-        let velocity = egui::plot::Line::new(plot_data.velocity).name("velocity [m/s]");
+    pub(crate) fn from_data(plot_data: &CachedTrajectoryPlotData) -> Self {
+        let velocity = egui::plot::Line::new(plot_data.velocity.clone()).name("velocity [m/s]");
 
-        let velocity_ref = egui::plot::Line::new(plot_data.velocity_ref).name("reference velocity [m/s]");
+        let velocity_ref =
+            egui::plot::Line::new(plot_data.velocity_ref.clone()).name("reference velocity [m/s]");
 
-        let acceleration = egui::plot::Line::new(plot_data.acceleration).name("acceleration [m/s\u{00B2}]");
+        let acceleration =
+            egui::plot::Line::new(plot_data.acceleration.clone()).name("acceleration [m/s\u{00B2}]");
 
-        let acceleration_ref =
-            egui::plot::Line::new(plot_data.acceleration_ref).name("reference acceleration [m/s\u{00B2}]");
+        let acceleration_ref = egui::plot::Line::new(plot_data.acceleration_ref.clone())
+            .name("reference acceleration [m/s\u{00B2}]");
 
-        let orientation = egui::plot::Line::new(plot_data.orientation).name("global orientation [rad]");
+        let orientation =
+            egui::plot::Line::new(plot_data.orientation.clone()).name("global orientation [rad]");
 
-        let orientation_ref = egui::plot::Line::new(plot_data.orientation_ref)
+        let orientation_ref = egui::plot::Line::new(plot_data.orientation_ref.clone())
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
             .name("reference global orientation [rad]");
 
-        let curvilinear_orientation =
-            egui::plot::Line::new(plot_data.curvilinear_orientation).name("curvilinear orientation [rad]");
+        let curvilinear_orientation = egui::plot::Line::new(plot_data.curvilinear_orientation.clone())
+            .name("curvilinear orientation [rad]");
 
         let curvilinear_orientation_ref =
-            egui::plot::Line::new(plot_data.curvilinear_orientation_ref)
+            egui::plot::Line::new(plot_data.curvilinear_orientation_ref.clone())
                 .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
                 .name("reference curvilinear orientation [rad]");
 
-        let kappa = egui::plot::Line::new(plot_data.kappa).name("curvature [1/m]");
+        let kappa = egui::plot::Line::new(plot_data.kappa.clone()).name("curvature [1/m]");
 
-        let kappa_ref = egui::plot::Line::new(plot_data.kappa_ref)
+        let kappa_ref = egui::plot::Line::new(plot_data.kappa_ref.clone())
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
             .name("reference curvature [1/m]");
 

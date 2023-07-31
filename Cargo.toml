@@ -2,10 +2,9 @@
 name = "corroscope"
 version = "0.1.0"
 edition = "2021"
-resolver = "2"
+readme = "README.md"
 
 [dependencies]
-# nalgebra = "0.32.3"
 bevy = { version = "^0.11.0", default_features = false, features = [
     #"bevy_asset",
     "bevy_core_pipeline",
@@ -28,6 +27,8 @@ bevy_mod_picking = { git = "https://github.com/Vrixyz/bevy_mod_picking", branch 
     "backend_raycast",
     "selection",
     ] }
+
+bevy_eventlistener = { git = "https://github.com/aevyrie/bevy_eventlistener.git", branch = "main" }
 
 bevy_framepace = "0.13.3"
 
