@@ -1,12 +1,6 @@
 use bevy::prelude::*;
 
-use bevy_mod_picking::prelude::*;
-use bevy_prototype_lyon::prelude::*;
-
-use bevy_egui::EguiContexts;
 use egui::plot::PlotPoint;
-
-use crate::global_settings::CurrentTimeStep;
 
 pub(crate) struct TrajectoryPlotData {
     velocity: egui::plot::Line,
@@ -39,6 +33,12 @@ pub struct CachedTrajectoryPlotData {
 }
 
 impl CachedTrajectoryPlotData {
+    pub(crate) fn matches_trajectory(&self, traj: &super::TrajectoryLog) -> bool {
+        self.time_step == traj.time_step
+            && self.trajectory_number == traj.trajectory_number
+            && self.unique_id == traj.unique_id
+    }
+
     pub(crate) fn from_trajectory(
         mtraj: &super::MainTrajectory,
         traj: &super::TrajectoryLog,
@@ -78,35 +78,39 @@ impl CachedTrajectoryPlotData {
 }
 
 impl TrajectoryPlotData {
-    pub(crate) fn from_data(plot_data: CachedTrajectoryPlotData) -> Self {
-        let velocity = egui::plot::Line::new(plot_data.velocity).name("velocity");
+    pub(crate) fn from_data(plot_data: &CachedTrajectoryPlotData) -> Self {
+        let velocity = egui::plot::Line::new(plot_data.velocity.clone()).name("velocity [m/s]");
 
-        let velocity_ref = egui::plot::Line::new(plot_data.velocity_ref).name("ref velocity");
+        let velocity_ref =
+            egui::plot::Line::new(plot_data.velocity_ref.clone()).name("reference velocity [m/s]");
 
-        let acceleration = egui::plot::Line::new(plot_data.acceleration).name("acceleration");
+        let acceleration = egui::plot::Line::new(plot_data.acceleration.clone())
+            .name("acceleration [m/s\u{00B2}]");
 
-        let acceleration_ref =
-            egui::plot::Line::new(plot_data.acceleration_ref).name("ref acceleration");
+        let acceleration_ref = egui::plot::Line::new(plot_data.acceleration_ref.clone())
+            .name("reference acceleration [m/s\u{00B2}]");
 
-        let orientation = egui::plot::Line::new(plot_data.orientation).name("orientation [rad]");
+        let orientation =
+            egui::plot::Line::new(plot_data.orientation.clone()).name("global orientation [rad]");
 
-        let orientation_ref = egui::plot::Line::new(plot_data.orientation_ref)
+        let orientation_ref = egui::plot::Line::new(plot_data.orientation_ref.clone())
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
-            .name("reference orientation [rad]");
+            .name("reference global orientation [rad]");
 
         let curvilinear_orientation =
-            egui::plot::Line::new(plot_data.curvilinear_orientation).name("orientation [rad]");
+            egui::plot::Line::new(plot_data.curvilinear_orientation.clone())
+                .name("curvilinear orientation [rad]");
 
         let curvilinear_orientation_ref =
-            egui::plot::Line::new(plot_data.curvilinear_orientation_ref)
+            egui::plot::Line::new(plot_data.curvilinear_orientation_ref.clone())
                 .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
-                .name("reference orientation [rad]");
+                .name("reference curvilinear orientation [rad]");
 
-        let kappa = egui::plot::Line::new(plot_data.kappa).name("orientation [rad]");
+        let kappa = egui::plot::Line::new(plot_data.kappa.clone()).name("curvature [1/m]");
 
-        let kappa_ref = egui::plot::Line::new(plot_data.kappa_ref)
+        let kappa_ref = egui::plot::Line::new(plot_data.kappa_ref.clone())
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
-            .name("reference orientation [rad]");
+            .name("reference curvature [1/m]");
 
         Self {
             velocity,
@@ -132,15 +136,20 @@ pub(crate) fn plot_traj(
 
     let group = egui::Id::new("trajectory plot group");
 
+    let plot_width = ui.available_width();
+
     let plot = |name: &'static str| {
         egui::plot::Plot::new(name)
             .legend(egui::plot::Legend::default().position(egui::plot::Corner::LeftBottom))
+            .allow_drag(false)
+            .allow_zoom(false)
             .view_aspect(2.0)
             .min_size(egui::Vec2::new(150.0, 75.0))
             .sharp_grid_lines(true)
             .include_x(0.0)
             .include_y(0.0)
-            .height(250.0)
+            .width(plot_width)
+            // .height(250.0)
             .link_cursor(group, true, false)
     };
 
@@ -215,7 +224,7 @@ pub(crate) fn plot_traj(
         }
     };
 
-    ui.heading("Orientation");
+    ui.heading("Global Orientation");
     let _theta_plot = plot("theta_plot")
         .center_y_axis(true)
         .label_formatter(angle_label_formatter)
@@ -245,7 +254,7 @@ pub(crate) fn plot_traj(
             }
         });
 
-    ui.heading("Kappa");
+    ui.heading("Curvature");
     let _theta_plot = plot("kappa_plot")
         .center_y_axis(true)
         .label_formatter(angle_label_formatter)

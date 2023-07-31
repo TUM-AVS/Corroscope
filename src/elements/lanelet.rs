@@ -61,7 +61,7 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
         opts.end_cap = LineCap::Round;
         opts.line_join = LineJoin::Round;
         opts.line_width = 0.1;
-        opts.tolerance = 1e-4;
+        opts.tolerance = 1e-3;
         opts
     };
     let normal_stroke = Stroke {
@@ -115,6 +115,9 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
 }
 
 pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
+    let _span =
+        bevy::log::info_span!("spawning lanelet", lanelet_id = lanelet.lanelet_id).entered();
+
     if let Some(stop_line) = &lanelet.stop_line {
         let stop_line_shape: shapes::Polygon = bevy_prototype_lyon::shapes::Polygon {
             points: stop_line.points.iter().map(Into::into).collect(),

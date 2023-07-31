@@ -1,5 +1,8 @@
 use bevy::prelude::*;
+
 use bevy_prototype_lyon::prelude::*;
+
+use bevy_mod_picking::prelude::*;
 
 #[derive(Debug, serde::Deserialize, Clone, Component, Reflect)]
 #[serde(transparent)]
@@ -7,10 +10,34 @@ pub struct RefPath {
     points: Vec<[f64; 2]>,
 }
 
+#[derive(Clone, Copy, Component, Reflect)]
+pub struct HoveredRefPath;
+
+pub fn ref_path_tooltip(mut contexts: bevy_egui::EguiContexts, ref_path_q: Query<&HoveredRefPath>) {
+    let ctx = contexts.ctx_mut();
+
+    if !ref_path_q.is_empty() {
+        egui::containers::show_tooltip(ctx, egui::Id::new("ref path tooltip"), |ui| {
+            ui.heading("Reference Path");
+        });
+    }
+}
+
 fn read_ref_path(path: &std::path::Path) -> Result<RefPath, Box<dyn std::error::Error>> {
     let file = std::fs::File::open(path).unwrap();
 
-    let data = serde_json::from_reader(file).unwrap();
+    let data: RefPath = serde_json::from_reader(file).unwrap();
+
+    for window in data.points.as_slice().windows(2) {
+        let [w1, w2] = window else { unreachable!() };
+
+        let v1 = glam::f64::DVec2::from(*w1);
+        let v2 = glam::f64::DVec2::from(*w2);
+
+        let diff = v1.distance(v2);
+
+        bevy::log::debug!("dist={:>7.3} v1={} v2={}", diff, v1, v2);
+    }
 
     Ok(data)
 }
@@ -42,5 +69,9 @@ pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>) {
             ..default()
         },
         Stroke::new(reference_path_color, 0.1),
+        PickableBundle::default(),
+        RaycastPickTarget::default(),
+        On::<Pointer<Over>>::target_insert(HoveredRefPath),
+        On::<Pointer<Out>>::target_remove::<HoveredRefPath>(),
     ));
 }

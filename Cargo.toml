@@ -2,9 +2,9 @@
 name = "corroscope"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
 
 [dependencies]
-# nalgebra = "0.32.3"
 bevy = { version = "^0.11.0", default_features = false, features = [
     #"bevy_asset",
     "bevy_core_pipeline",
@@ -25,13 +25,14 @@ bevy_pancam = { version = "0.9", features = [ "bevy_egui" ] }
 bevy_mod_picking = { git = "https://github.com/Vrixyz/bevy_mod_picking", branch = "bevy-0.11-compatibility", default_features = false, features = [
     # "backend_egui",
     "backend_raycast",
-    "highlight",
     "selection",
     ] }
 
+bevy_eventlistener = { git = "https://github.com/aevyrie/bevy_eventlistener.git", branch = "main" }
+
 bevy_framepace = "0.13.3"
 
-bevy-inspector-egui = { version = "0.19.0", optional = false }
+bevy-inspector-egui = { version = "0.19.0", optional = false, default_features = false }
 bevy_editor_pls = { git = "https://github.com/jakobhellermann/bevy_editor_pls.git", branch = "main", optional = true }
 
 bevy_mod_debugdump = { version = "0.8.0", optional = true }
@@ -65,6 +66,7 @@ itertools = "0.11.0"
 memmap2 = "0.7.1"
 futures-lite = "1.13.0"
 thingbuf = "0.1.4"
+egui_extras = "0.22.0"
 
 # bevy_picking_egui = { git = "https://github.com/Vrixyz/bevy_mod_picking", branch = "bevy-0.11-compatibility", package = "bevy_picking_egui", default_features = false }
 

@@ -1,8 +1,5 @@
 use bevy::prelude::*;
 
-// #[cfg(feature = "inspector")]
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
-
 #[cfg(feature = "editor")]
 use bevy_editor_pls::prelude::*;
 
@@ -26,6 +23,10 @@ mod global_settings;
 
 mod args;
 
+mod finite;
+
+mod ui;
+
 impl Resource for CommonRoad {}
 
 fn main() -> color_eyre::eyre::Result<()> {
@@ -40,13 +41,9 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     let mut app = App::new();
 
-    app.insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
-        .insert_resource(Msaa::Sample4)
-        .insert_resource(cr)
+    app.insert_resource(cr)
         .insert_resource(args)
         .insert_resource(bevy::winit::WinitSettings::desktop_app())
-        .init_resource::<global_settings::GlobalSettings>()
-        .init_resource::<global_settings::TimeStep>()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Corroscope".into(),
@@ -61,17 +58,29 @@ fn main() -> color_eyre::eyre::Result<()> {
             exit_condition: bevy::window::ExitCondition::OnPrimaryClosed,
             close_when_requested: true,
         }))
-        .add_plugins(DefaultPickingPlugins)
         .add_plugins(LogDiagnosticsPlugin::default())
-        .add_plugins(FrameTimeDiagnosticsPlugin)
+        .add_plugins(FrameTimeDiagnosticsPlugin);
+
+    // Rendering
+    app.insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
+        .insert_resource(Msaa::Sample4)
         .add_plugins(bevy_framepace::FramepacePlugin)
         .add_plugins(bevy_egui::EguiPlugin)
         .add_plugins(bevy_prototype_lyon::prelude::ShapePlugin)
         .add_plugins(bevy_pancam::PanCamPlugin)
-        .add_systems(Startup, (camera_setup, update_ui_scale_factor))
-        .add_systems(Update, global_settings::side_panel)
+        .add_systems(Startup, (camera_setup, update_ui_scale_factor));
+
+    // Picking
+    app.add_plugins(DefaultPickingPlugins).insert_resource(
+        bevy_mod_picking::selection::SelectionSettings {
+            click_nothing_deselect_all: true,
+            use_multiselect_default_inputs: false,
+        },
+    );
+
+    app.add_plugins(global_settings::GlobalSettingsPlugin)
         .add_plugins(elements::ElementsPlugin)
-        .add_systems(Update, global_settings::animate_time);
+        .add_plugins(ui::SelectiveInputPlugin);
 
     #[cfg(feature = "debug_picking")]
     {
@@ -87,31 +96,50 @@ fn main() -> color_eyre::eyre::Result<()> {
         );
     }
 
-    // app
-    //     .register_type::<bevy_prototype_lyon::draw::Stroke>()
-    //     .register_type::<bevy_prototype_lyon::draw::Fill>();
-
-    // #[cfg(feature = "inspector")]
-    // app.add_plugins(WorldInspectorPlugin::new());
-
-    app.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin);
-
-    #[cfg(feature = "editor")]
-    app.add_plugins(EditorPlugin::on_second_monitor_fullscreen(
-        EditorPlugin::default(),
-    ));
-
-    #[cfg(feature = "export_schedule")]
+    #[cfg(feature = "inspector")]
     {
-        use std::io::Write;
+        use bevy_inspector_egui::quick::WorldInspectorPlugin;
+        app.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin);
 
-        let settings = bevy_mod_debugdump::render_graph::Settings::default();
-        let dot = bevy_mod_debugdump::render_graph_dot(&mut app, &settings);
-        let mut dot_file = std::fs::File::create("bevy_schedule.dot").unwrap();
-        dot_file.write_all(dot.as_bytes()).unwrap();
+        // app.add_plugins(WorldInspectorPlugin::new());
     }
 
+    #[cfg(feature = "editor")]
+    {
+        const ENABLE_EDITOR: bool = false;
+
+        if ENABLE_EDITOR {
+            app.add_plugins(EditorPlugin::on_second_monitor_fullscreen(
+                EditorPlugin::default(),
+            ));
+        }
+    }
+
+    #[cfg(feature = "export_schedule")]
+    export_dot(&mut app)?;
+
     app.run();
+
+    Ok(())
+}
+
+#[cfg(feature = "export_schedule")]
+fn export_dot(app: &mut App) -> Result<(), std::io::Error> {
+    use std::io::Write;
+
+    {
+        let settings = bevy_mod_debugdump::render_graph::Settings::default();
+        let dot = bevy_mod_debugdump::render_graph_dot(app, &settings);
+        let mut dot_file = std::fs::File::create("bevy_render.dot")?;
+        dot_file.write_all(dot.as_bytes())?;
+    }
+
+    {
+        let settings = bevy_mod_debugdump::schedule_graph::Settings::default();
+        let dot = bevy_mod_debugdump::schedule_graph_dot(app, Update, &settings);
+        let mut dot_file = std::fs::File::create("bevy_schedule.dot")?;
+        dot_file.write_all(dot.as_bytes())?;
+    }
 
     Ok(())
 }
@@ -146,12 +174,9 @@ fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
     commonroad_pb::CommonRoad::decode(buf).unwrap()
 }
 
-use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_egui::EguiSettings;
-
 fn update_ui_scale_factor(
-    mut egui_settings: ResMut<EguiSettings>,
-    windows: Query<&Window, With<PrimaryWindow>>,
+    mut egui_settings: ResMut<bevy_egui::EguiSettings>,
+    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
 ) {
     if let Ok(window) = windows.get_single() {
         egui_settings.scale_factor = 1.0 / window.scale_factor();
