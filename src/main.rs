@@ -126,6 +126,7 @@ fn main() -> color_eyre::eyre::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "export_schedule")]
 fn export_dot(app: &mut App) -> Result<(), std::io::Error> {
     use std::io::Write;
 
