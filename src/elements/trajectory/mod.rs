@@ -22,6 +22,7 @@ pub struct MainTrajectory {
 }
 
 #[derive(Component, Default, Copy, Clone)]
+#[component(storage = "SparseSet")]
 pub struct HoveredTrajectory;
 
 #[derive(Default, Component)]
@@ -35,12 +36,14 @@ pub(crate) struct TrajectoryGroup {
 }
 
 #[derive(Component, Reflect, Clone, Copy)]
+#[component(storage = "SparseSet")]
 pub(crate) struct SelectedTrajectory;
 
 #[derive(Component, Reflect, Clone, Copy)]
 pub(crate) struct HasInvalidData;
 
 #[derive(Component, Reflect, Clone, Copy)]
+#[component(storage = "SparseSet")]
 pub(crate) struct CurrentTrajectoryGroup;
 
 #[derive(Event)]

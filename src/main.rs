@@ -145,7 +145,8 @@ fn export_dot(app: &mut App) -> Result<(), std::io::Error> {
 }
 
 #[derive(Component)]
-pub struct MainCamera;
+#[component(storage = "SparseSet")]
+pub(crate) struct MainCamera;
 
 fn camera_setup(mut commands: Commands) {
     commands

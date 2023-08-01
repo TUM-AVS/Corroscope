@@ -34,6 +34,7 @@ fn state_transform(state: &commonroad_pb::State) -> Option<Transform> {
 pub struct ObstacleData(commonroad_pb::DynamicObstacle);
 
 #[derive(Component)]
+#[component(storage = "SparseSet")]
 pub struct HoveredObstacle;
 
 pub fn obstacle_tooltip(

@@ -11,6 +11,7 @@ pub struct RefPath {
 }
 
 #[derive(Clone, Copy, Component, Reflect)]
+#[component(storage = "SparseSet")]
 pub struct HoveredRefPath;
 
 pub fn ref_path_tooltip(mut contexts: bevy_egui::EguiContexts, ref_path_q: Query<&HoveredRefPath>) {
