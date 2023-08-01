@@ -44,6 +44,7 @@ rust-latest-release:
   after_script:
     - mv target/release/corroscope .
   artifacts:
+    untracked: false
     expire_in: 30 days
     name: "corroscope-bin"
     expose_as: "Built Executable"
@@ -68,15 +69,15 @@ clippy:
       when: never
     - if: '$CI_PIPELINE_SOURCE == "push"'
 
-docs:
+pages:
   stage: docs
   needs: []
   script:
-    - cargo --color always --locked doc
+    - cargo --color always --locked doc --no-deps
+  after_script:
+    - mv target/doc public
   artifacts:
-    expire_in: 30 days
-    name: docs
-    expose_as: "Documentation"
+    untracked: false
     paths:
-      - target/doc/
+      - public
 
