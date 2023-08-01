@@ -95,7 +95,7 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
         LineMarking::Unknown => {
             bevy::log::info!("lanelet bound has unknown line marking");
 
-            (short_dashed_path, light_stroke)
+            (rb_path, light_stroke)
         }
         LineMarking::NoMarking => {
             bevy::log::info!("lanelet bound has no line marking");
