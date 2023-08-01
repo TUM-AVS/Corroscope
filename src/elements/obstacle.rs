@@ -265,6 +265,10 @@ pub fn trajectory_animation(
     mut obstacle_q: Query<(&ObstacleData, &mut Transform)>,
     cts: Res<crate::global_settings::CurrentTimeStep>,
 ) {
+    if !cts.is_changed() {
+        return;
+    }
+
     for (obs, mut transform) in obstacle_q.iter_mut() {
         let commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj) =
             &obs.0.prediction.as_ref().unwrap()
@@ -319,6 +323,6 @@ pub fn spawn_obstacles(mut commands: Commands, cr: Res<crate::CommonRoad>) {
 
     commands.insert_resource(crate::global_settings::CurrentTimeStep {
         dynamic_time_step: 0.0,
-        prediction_range: 0.0..=(max_ts as f32),
+        prediction_range: 0.0..=((max_ts - 1) as f32),
     });
 }

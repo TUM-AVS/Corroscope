@@ -67,8 +67,7 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_plugins(bevy_framepace::FramepacePlugin)
         .add_plugins(bevy_egui::EguiPlugin)
         .add_plugins(bevy_prototype_lyon::prelude::ShapePlugin)
-        .add_plugins(bevy_pancam::PanCamPlugin)
-        .add_systems(Startup, (camera_setup, update_ui_scale_factor));
+        .add_plugins(bevy_pancam::PanCamPlugin);
 
     // Picking
     app.add_plugins(DefaultPickingPlugins).insert_resource(
@@ -80,7 +79,8 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     app.add_plugins(global_settings::GlobalSettingsPlugin)
         .add_plugins(elements::ElementsPlugin)
-        .add_plugins(ui::SelectiveInputPlugin);
+        .add_plugins(ui::SelectiveInputPlugin)
+        .add_systems(Startup, camera_setup);
 
     #[cfg(feature = "debug_picking")]
     {
@@ -175,11 +175,3 @@ fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
     commonroad_pb::CommonRoad::decode(buf).unwrap()
 }
 
-fn update_ui_scale_factor(
-    mut egui_settings: ResMut<bevy_egui::EguiSettings>,
-    windows: Query<&Window, With<bevy::window::PrimaryWindow>>,
-) {
-    if let Ok(window) = windows.get_single() {
-        egui_settings.scale_factor = 1.0 / window.scale_factor();
-    }
-}

@@ -21,7 +21,8 @@ impl Plugin for SelectiveInputPlugin {
             .add_systems(
                 PostUpdate,
                 egui_wants_input.after(bevy_egui::EguiSet::ProcessOutput),
-            );
+            )
+            .add_systems(PreUpdate, update_ui_scale_factor);
     }
 }
 
@@ -116,4 +117,13 @@ fn egui_block_picking(
     bevy::log::debug!("setting picking enabled to {}", picking_enable);
 
     picking_settings.enable = picking_enable;
+}
+
+fn update_ui_scale_factor(
+    mut egui_settings: ResMut<bevy_egui::EguiSettings>,
+    windows: Query<&Window, Changed<bevy::window::PrimaryWindow>>,
+) {
+    if let Ok(window) = windows.get_single() {
+        egui_settings.scale_factor = 1.0 / window.scale_factor();
+    }
 }

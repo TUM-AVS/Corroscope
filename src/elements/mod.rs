@@ -9,21 +9,41 @@ pub struct ElementsPlugin;
 
 impl Plugin for ElementsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, obstacle::spawn_obstacles)
-            .add_systems(Startup, lanelet::spawn_lanelets)
-            .add_systems(Startup, trajectory::spawn_trajectories)
-            .add_systems(Startup, ref_path::spawn_ref_path)
-            .add_systems(Update, trajectory::trajectory_group_visibility)
-            .add_systems(Update, trajectory::trajectory_visibility)
-            .add_systems(Update, trajectory::trajectory_tooltip)
-            .add_systems(Update, trajectory::trajectory_window)
-            .add_systems(Update, trajectory::trajectory_list)
+        app
+            .init_resource::<trajectory::TrajectorySortKey>()
+            .init_resource::<trajectory::SortDirection>()
+            .add_systems(Startup,
+                (
+                    obstacle::spawn_obstacles,
+                    lanelet::spawn_lanelets,
+                    trajectory::spawn_trajectories,
+                    ref_path::spawn_ref_path,
+                )
+            )
+            .add_systems(Update,
+                (
+                        trajectory::trajectory_group_visibility,
+                        trajectory::trajectory_visibility,
+                        trajectory::trajectory_tooltip,
+                        obstacle::obstacle_tooltip,
+                        obstacle::trajectory_animation,
+                        ref_path::ref_path_tooltip,
+                        // obstacle::plot_obs,
+                )
+            )
+            .add_systems(Update,
+                (
+                    (
+                        trajectory::trajectory_list,
+                    ),
+                    (
+                        trajectory::trajectory_window,
+                        trajectory::sort_trajectory_list,
+                    ),
+                ).chain()
+            )
             .add_event::<trajectory::SelectTrajectoryEvent>()
-            .add_systems(PostUpdate, trajectory::update_selected_trajectory)
-            // .add_systems(Update, obstacle::plot_obs)
-            .add_systems(Update, obstacle::obstacle_tooltip)
-            .add_systems(Update, obstacle::trajectory_animation)
-            .add_systems(Update, ref_path::ref_path_tooltip);
+            .add_systems(PostUpdate, trajectory::update_selected_trajectory);
 
         app.register_type::<trajectory::TrajectoryLog>()
             .register_type::<trajectory::MainLog>()

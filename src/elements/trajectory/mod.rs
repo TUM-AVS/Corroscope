@@ -7,7 +7,7 @@ use bevy_prototype_lyon::prelude::*;
 
 use bevy_egui::EguiContexts;
 
-use crate::global_settings::CurrentTimeStep;
+use crate::global_settings::{TimeStep, CurrentTimeStep};
 
 mod plot;
 
@@ -500,14 +500,14 @@ fn trajectory_description(
         .with_main_justify(true);
 
     ui.horizontal_top(|ui| {
-    ui.label(
-        egui::RichText::new(format!(
-            "Trajectory {} (id: {})",
-            traj.trajectory_number, traj.unique_id
-        ))
-        .heading()
-        .size(26.0),
-    );
+        ui.label(
+            egui::RichText::new(format!(
+                "Trajectory {} (id: {})",
+                traj.trajectory_number, traj.unique_id
+            ))
+            .heading()
+            .size(26.0),
+        );
 
         if *issues_detected.borrow() {
             let resp = ui.label(egui::RichText::new("\u{26A0}").heading().size(24.0).color(egui::Color32::YELLOW));
@@ -527,7 +527,7 @@ fn trajectory_description(
     });
 
     let overview_left = |ui: &mut egui::Ui| {
-        ui.label("final position:");
+        ui.label("initial position:");
         ui.indent("curvilinear position", |ui| {
             ui.horizontal_top(|ui| {
                 ui.vertical(|ui| {
@@ -543,19 +543,16 @@ fn trajectory_description(
             });
         });
 
-        match (traj.ego_risk, traj.obst_risk) {
-            (Some(ego_risk), Some(obst_risk)) => {
-                ui.horizontal_top(|ui| {
-                    ui.label("ego risk:");
-                    rich_label!(ui, ego_risk, "{:.3}");
-                });
-                ui.horizontal_top(|ui| {
-                    ui.label("obst risk:");
-                    rich_label!(ui, obst_risk, "{:.3}");
-                });
-            }
-            _ => {}
-        };
+        if let (Some(ego_risk), Some(obst_risk)) = (traj.ego_risk, traj.obst_risk) {
+            ui.horizontal_top(|ui| {
+                ui.label("ego risk:");
+                rich_label!(ui, ego_risk, "{:.3}");
+            });
+            ui.horizontal_top(|ui| {
+                ui.label("obst risk:");
+                rich_label!(ui, obst_risk, "{:.3}");
+            });
+        }
     };
 
     use egui_extras::{Column, TableBuilder};
@@ -613,12 +610,9 @@ fn trajectory_description(
                     });
             });
             strip.cell(|ui| {
-                // let resp = ui.label(format!("total cost: {:.3}", traj.costs_cumulative_weighted));
-                //resp.on_hover_text(traj.costs_cumulative_weighted.to_string());
-
                 ui.separator();
 
-                ui.heading("Costs");
+                ui.collapsing("Costs", |ui| {
 
                 let hide_small_costs_id = ui.make_persistent_id("hide small costs");
                 let cost_threshold_id = ui.make_persistent_id("cost map threshold");
@@ -686,12 +680,15 @@ fn trajectory_description(
                         });
                 });
 
+                });
+
                 ui.add_space(10.0);
 
-                ui.heading("Feasability");
+                //ui.heading("Feasability");
 
-                ui.push_id("feasability table", |ui| {
-                    TableBuilder::new(ui)
+                // ui.push_id("feasability table", |ui| {
+                ui.collapsing("Feasability", |ui| {
+                        TableBuilder::new(ui)
                         .striped(true)
                         .column(Column::exact(300.0).resizable(true))
                         .column(Column::remainder())
@@ -704,8 +701,8 @@ fn trajectory_description(
                                     egui::RichText::new("Violated Count").heading().size(14.0),
                                 );
                                 resp.on_hover_text(
-                        "Number of time steps in which this feasability check was violated",
-                    );
+                                    "Number of time steps in which this feasability check was violated",
+                                );
                             });
                         })
                         .body(|mut body| {
@@ -762,6 +759,7 @@ pub(crate) fn trajectory_window(
         With<SelectedTrajectory>,
     >,
 
+    ts: Res<TimeStep>,
     cts: Res<CurrentTimeStep>,
 
     mtraj: Res<MainTrajectory>,
@@ -788,8 +786,6 @@ pub(crate) fn trajectory_window(
                     };
                     let (entity, traj, invalid_data) = selected_traj;
 
-                    // cached_plot_data.
-                    // cached_plot_data.
                     let mut new_data = cached_plot_data
                         .take()
                         .filter(|data| data.matches_trajectory(traj));
@@ -894,7 +890,7 @@ macro_rules! rich_label {
     };
 }
 
-#[derive(Default, PartialEq, Eq)]
+#[derive(Default, PartialEq, Eq, Resource)]
 pub(crate) enum TrajectorySortKey {
     #[default]
     ID,
@@ -903,7 +899,7 @@ pub(crate) enum TrajectorySortKey {
     Cost,
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub(crate) enum SortDirection {
     #[default]
     Ascending,
@@ -921,6 +917,13 @@ impl SortDirection {
             SortDirection::Descending => SortDirection::Ascending,
         }
     }
+
+    fn symbol(&self) -> char {
+        match self {
+            SortDirection::Ascending => '\u{2B06}',
+            SortDirection::Descending => '\u{2B07}',
+        }
+    }
 }
 
 use crate::finite::{Finite, Finite32};
@@ -932,7 +935,6 @@ impl TrajectoryLog {
             .iter()
             .map(|v| v.abs().try_into().unwrap())
             .max()
-            // .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap()
     }
 
@@ -948,36 +950,30 @@ impl TrajectoryLog {
     }
 }
 
-pub(crate) fn trajectory_list(
-    mut contexts: EguiContexts,
-
-    selected_q: Query<Entity, Added<SelectedTrajectory>>,
-
-    trajectory_q: Query<(
-        &TrajectoryLog,
-        bevy::ecs::query::Has<SelectedTrajectory>,
-        bevy::ecs::query::Has<HasInvalidData>,
-    )>,
+pub(crate) fn sort_trajectory_list(
+    trajectory_q: Query<&TrajectoryLog>,
 
     mut group_q: Query<&mut Children, With<CurrentTrajectoryGroup>>,
 
-    cts: Res<CurrentTimeStep>,
+    sort_key: Res<TrajectorySortKey>,
+    sort_dir: Res<SortDirection>,
+
+    time_step: Res<crate::global_settings::TimeStep>,
 
     mut send_selection_event: EventWriter<SelectTrajectoryEvent>,
-
-    mut sort_key: Local<TrajectorySortKey>,
-    mut sort_dir: Local<SortDirection>,
 ) {
-    let ctx = contexts.ctx_mut();
+    if !sort_key.is_changed() && !sort_dir.is_changed() && !time_step.is_changed() {
+        return;
+    }
 
     let Ok(mut children) = group_q.get_single_mut() else {
         return;
     };
 
     let key = |entity: &Entity| {
-        let (traj, _selected, _invalid_data) = trajectory_q.get(*entity).unwrap();
+        let traj = trajectory_q.get(*entity).unwrap();
 
-        let val = match *sort_key {
+        let val: Finite<f32> = match *sort_key {
             TrajectorySortKey::ID => Finite::from(traj.unique_id),
             TrajectorySortKey::MaxCurvilinearDeviation => traj.max_deviation(),
             TrajectorySortKey::FinalVelocity => traj.final_velocity(),
@@ -992,6 +988,39 @@ pub(crate) fn trajectory_list(
     };
     children.sort_by_cached_key(key);
 
+    if time_step.is_changed() {
+        if let Some(entity) = children.first() {
+           send_selection_event.send(SelectTrajectoryEvent(*entity));
+        }
+    }
+}
+
+pub(crate) fn trajectory_list(
+    mut contexts: EguiContexts,
+
+    selected_q: Query<Entity, Added<SelectedTrajectory>>,
+
+    trajectory_q: Query<(
+        &TrajectoryLog,
+        bevy::ecs::query::Has<SelectedTrajectory>,
+        bevy::ecs::query::Has<HasInvalidData>,
+    )>,
+
+    group_q: Query<&Children, With<CurrentTrajectoryGroup>>,
+
+    ts: Res<TimeStep>,
+
+    mut send_selection_event: EventWriter<SelectTrajectoryEvent>,
+
+    mut sort_key: ResMut<TrajectorySortKey>,
+    mut sort_dir: ResMut<SortDirection>,
+) {
+    let ctx = contexts.ctx_mut();
+
+    let Ok(children) = group_q.get_single() else {
+        return;
+    };
+
     let selected_idx = selected_q
         .get_single()
         .ok()
@@ -1002,7 +1031,7 @@ pub(crate) fn trajectory_list(
         .with_main_justify(true);
 
     use egui_extras::{Column, TableBuilder};
-    egui::Window::new(format!("Trajectory List for Time Step {}", cts.fixed_time_step()))
+    egui::Window::new(format!("Trajectory List for Time Step {}", ts.time_step))
         .id(egui::Id::new("trajectory list window"))
         .show(ctx, |ui| {
         let mut tb = TableBuilder::new(ui)
@@ -1013,27 +1042,28 @@ pub(crate) fn trajectory_list(
             .column(Column::exact(100.0).clip(true))
             ;
 
+        if sort_key.is_changed() || sort_dir.is_changed() {
+            tb = tb.scroll_to_row(0, None);
+        }
         if let Some(idx) = selected_idx {
             tb = tb.scroll_to_row(idx, None);
         }
         tb.header(34.0, |mut header| {
+                let sort_key: &mut TrajectorySortKey = &mut sort_key;
                 macro_rules! header_entry {
                     ($key:expr, $label:expr) => {
                         header.col(|ui| {
-                            use core::ops::DerefMut;
+                            // use core::ops::DerefMut;
                             let selected = *sort_key == $key;
-                            let sort_dir_symbol = match *sort_dir {
-                                SortDirection::Ascending => '\u{2B06}',
-                                SortDirection::Descending => '\u{2B07}',
-                            };
-                            let label_text = if selected { format!("{} {}", $label, sort_dir_symbol) } else { $label.to_string() };
-                            let resp = ui.selectable_value(sort_key.deref_mut(), $key, egui::RichText::new(label_text).heading().size(14.0));
+                            let label_text = if selected { format!("{} {}", $label, sort_dir.symbol()) } else { $label.to_string() };
+                            let text = egui::RichText::new(label_text).heading().size(14.0);
+                            let resp = ui.selectable_value(sort_key, $key, text);
                             if resp.changed() {
                                 *sort_dir = SortDirection::default();
                             }
                             if resp.clicked() && selected {
                                 sort_dir.toggle();
-                            };
+                            }
                         })
                     }
                 }
@@ -1053,6 +1083,8 @@ pub(crate) fn trajectory_list(
                             let clicked = ui.selectable_label(selected, traj.unique_id.to_string()).clicked();
                             if !selected && clicked {
                                 send_selection_event.send(SelectTrajectoryEvent(entity));
+                                sort_dir.set_changed();
+                                sort_key.set_changed();
                             }
 
                             if invalid_data {
@@ -1062,6 +1094,9 @@ pub(crate) fn trajectory_list(
 
                             if !traj.feasible {
                                 ui.label(egui::RichText::new("(infeasible)").italics().weak());
+                            } else {
+                                ui.label(egui::RichText::new("\u{2714}").italics().weak());
+
                             }
                         });
                     });
