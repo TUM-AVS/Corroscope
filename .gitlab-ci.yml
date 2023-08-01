@@ -1,6 +1,7 @@
 stages:
   - build
   - lint
+  - docs
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/cargo
@@ -43,8 +44,6 @@ rust-latest-release:
   after_script:
     - mv target/release/corroscope .
   artifacts:
-    untracked: false
-    when: on_success
     expire_in: 30 days
     name: "corroscope-bin"
     expose_as: "Built Executable"
@@ -68,3 +67,16 @@ clippy:
     - if: '$CODE_QUALITY_DISABLED'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "push"'
+
+docs:
+  stage: docs
+  needs: []
+  script:
+    - cargo --color always --locked doc
+  artifacts:
+    expire_in: 30 days
+    name: docs
+    expose_as: "Documentation"
+    paths:
+      - target/doc/
+
