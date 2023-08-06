@@ -39,7 +39,7 @@ fn make_dashed(path: &lyon_path::Path, dash_length: f32, dash_ratio: f32) -> lyo
     builder.build()
 }
 
-fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
+fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> {
     let bound_pts = bound
         .points
         .iter()
@@ -77,7 +77,7 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
         },
     };
     let light_stroke = Stroke {
-        color: Color::LIME_GREEN.with_a(0.5),
+        color: Color::VIOLET + Color::hsl(0.0, -0.15, -0.35),
         options: {
             let mut opts = stroke_opts;
             opts.line_width = 0.07;
@@ -104,17 +104,19 @@ fn spawn_bound(bound: &commonroad_pb::Bound, id: u32) -> Option<impl Bundle> {
         }
     };
 
+    let bound_z = 1e-1 + (z_idx * 1e-5);
+    bevy::log::info!("bound_z={}", bound_z);
     Some((
         ShapeBundle {
             path,
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 1e-1 + (id as f32 * 1e-2))),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, bound_z)),
             ..default()
         },
         stroke,
     ))
 }
 
-pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) {
+pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet, z_idx: f32) {
     let _span =
         bevy::log::info_span!("spawning lanelet", lanelet_id = lanelet.lanelet_id).entered();
 
@@ -167,12 +169,12 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) 
         ))
         .set_parent_in_place(main_entity);
 
-    if let Some(bound) = spawn_bound(&lanelet.left_bound, lanelet.lanelet_id) {
+    if let Some(bound) = spawn_bound(&lanelet.left_bound, z_idx) {
         commands
             .spawn((Name::new("left bound"), LeftBound, bound))
             .set_parent(main_entity);
     }
-    if let Some(bound) = spawn_bound(&lanelet.right_bound, lanelet.lanelet_id) {
+    if let Some(bound) = spawn_bound(&lanelet.right_bound, z_idx) {
         commands
             .spawn((Name::new("right bound"), RightBound, bound))
             .set_parent(main_entity);
@@ -199,7 +201,11 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet) 
 }
 
 pub fn spawn_lanelets(mut commands: Commands, cr: Res<crate::CommonRoad>) {
-    for lanelet in &cr.lanelets {
-        spawn_lanelet(&mut commands, lanelet);
+    let lanelet_count = cr.lanelets.len() as f32;
+
+    for (idx, lanelet) in cr.lanelets.iter().enumerate() {
+        let z_idx = idx as f32 / lanelet_count;
+
+        spawn_lanelet(&mut commands, lanelet, z_idx);
     }
 }
