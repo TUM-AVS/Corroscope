@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use bevy_prototype_lyon::prelude::Stroke;
+
 fn deserialize_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -135,9 +137,22 @@ pub(crate) struct TrajectoryLog {
 }
 
 impl TrajectoryLog {
-    pub(crate) fn color(&self) -> Color {
+    pub(crate) fn normal_stroke(&self, max_cost: f64) -> Stroke {
+        let mut stroke = Stroke::new(self.color(max_cost), 0.02);
+        stroke.options.tolerance = 10.0;
+        stroke
+    }
+
+    pub(crate) fn selected_stroke(&self, max_cost: f64) -> Stroke {
+        let mut stroke = Stroke::new(self.selected_color(max_cost), 0.02);
+        stroke.options.tolerance = 10.0;
+        stroke
+    }
+
+   pub(crate) fn color(&self, max_cost: f64) -> Color {
         if self.feasible {
             let time_step_gradient = false;
+            let old_gradient = false;
             if time_step_gradient {
                 Color::rgba_u8(
                     170_u8.saturating_sub((self.time_step as u8).saturating_mul(3)),
@@ -145,21 +160,30 @@ impl TrajectoryLog {
                     90_u8,
                     40,
                 )
-            } else {
-                let max_cost = 20.0;
+            } else if old_gradient {
                 let unit_cost = self.costs_cumulative_weighted / max_cost;
                 let cost_val = 37.0 + (unit_cost.fract() * 360.0);
                 let c = Color::hsla(cost_val as f32, 0.7, 0.7, 0.4);
                 bevy::log::trace!("color={:?}", c);
                 c
+            } else {
+                const GRAD: colorous::Gradient = colorous::VIRIDIS;
+
+                let unit_cost = self.costs_cumulative_weighted.log2() / max_cost.log2();
+                bevy::log::debug!("unit={} cost={} max={}", unit_cost, self.costs_cumulative_weighted, max_cost);
+
+                let grad_color = GRAD.eval_continuous(unit_cost);
+                let c = Color::rgb_u8(grad_color.r, grad_color.g, grad_color.b);
+                bevy::log::trace!("color={:?}", c);
+                c.with_a(0.7)
             }
         } else {
             Color::rgba_u8(30, 70, 190, 100)
         }
     }
 
-    pub(crate) fn selected_color(&self) -> Color {
-        let base_color = self.color().as_hsla();
+    pub(crate) fn selected_color(&self, max_cost: f64) -> Color {
+        let base_color = self.color(max_cost).as_hsla();
         base_color + Color::hsla(0.0, 0.1, 0.15, 0.2)
     }
 

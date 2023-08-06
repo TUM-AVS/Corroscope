@@ -15,6 +15,7 @@ pub(crate) mod log;
 
 pub(crate) use log::{KinematicData, MainLog, TrajectoryLog};
 
+#[allow(unused)]
 #[derive(Resource)]
 pub struct MainTrajectory {
     path: Vec<Vec2>,
@@ -33,6 +34,11 @@ pub struct PointerTimeStep {
 #[derive(Component, Reflect)]
 pub(crate) struct TrajectoryGroup {
     time_step: i32,
+}
+
+#[derive(Resource, Reflect)]
+pub(crate) struct MaxCosts {
+    max_costs: f64,
 }
 
 #[derive(Component, Reflect, Clone, Copy)]
@@ -55,7 +61,25 @@ impl From<bevy_eventlistener::callbacks::ListenerInput<Pointer<Select>>> for Sel
     }
 }
 
-fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<impl Bundle>)> {
+
+
+pub(super) fn update_stroke(
+    max_costs: Res<MaxCosts>,
+
+    mut trajectory_q: Query<
+        (&TrajectoryLog, &mut Stroke)
+    >,
+) {
+    if !max_costs.is_changed() {
+        return;
+    }
+
+    for (traj, mut stroke) in trajectory_q.iter_mut() {
+        *stroke = traj.normal_stroke(max_costs.max_costs);
+    }
+}
+
+fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<impl Bundle>, f64)> {
     let points: Vec<Vec2> = traj.kinematic_data.positions().collect();
 
     if !points.iter().all(|v| v.x.is_finite() && v.y.is_finite()) {
@@ -67,19 +91,18 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
         closed: false,
     };
 
+    let traj_z = 24.0 + (traj.unique_id as f32) * 1e-6;
+    bevy::log::info!("using traj_z={}", traj_z);
+
     let base_bundle = (
         Name::new(format!("trajectory {}", traj.trajectory_number)),
         traj.to_owned(),
         ShapeBundle {
             path: GeometryBuilder::build_as(&traj_shape),
-            transform: Transform::from_xyz(0.0, 0.0, 4.0 + (traj.unique_id as f32) * 1e-6),
+            transform: Transform::from_xyz(0.0, 0.0, traj_z),
             ..default()
         },
-        {
-            let mut stroke = Stroke::new(traj.color(), 0.02);
-            stroke.options.tolerance = 10.0;
-            stroke
-        },
+        traj.normal_stroke(100.0),
         On::<Pointer<Select>>::send_event::<SelectTrajectoryEvent>(),
         // On::<Pointer<Select>>::target_insert((SelectedTrajectory, Stroke::new(selected_color, 0.02))),
         // On::<Pointer<Deselect>>::target_commands_mut(|_ptr, commands| {
@@ -92,36 +115,39 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
         RaycastPickTarget::default(),
     );
 
-    if traj.costs.values().any(|v| !v.is_finite()) {
-        Some((base_bundle, Some(HasInvalidData)))
+    let extra_bundle = if traj.costs.values().any(|v| !v.is_finite()) {
+        Some(HasInvalidData)
     } else {
-        Some((base_bundle, None))
-    }
+        None
+    };
+
+    Some((base_bundle, extra_bundle, traj.costs_cumulative_weighted))
 }
 
 pub(super) fn update_selected_trajectory(
     mut commands: Commands,
 
+    max_costs: Res<MaxCosts>,
+
     mut selection_events: EventReader<SelectTrajectoryEvent>,
 
     mut trajectory_q: Query<
-        (&TrajectoryLog, &mut Transform, &mut Visibility),
+        (&TrajectoryLog, &mut Transform, &mut Stroke, &mut Visibility),
         Without<SelectedTrajectory>,
     >,
 
-    mut selected_q: Query<(Entity, &TrajectoryLog, &mut Visibility), With<SelectedTrajectory>>,
+    mut selected_q: Query<(Entity, &TrajectoryLog, &mut Stroke, &mut Visibility), With<SelectedTrajectory>>,
 ) {
     let new_selection = !selection_events.is_empty();
     if !new_selection {
         return;
     }
 
-    for (entity, traj, mut visibility) in selected_q.iter_mut() {
+    for (entity, traj, mut stroke, mut visibility) in selected_q.iter_mut() {
         let mut ecommands = commands.entity(entity);
         ecommands.remove::<SelectedTrajectory>();
 
-        let normal_color = traj.color();
-        ecommands.insert(Stroke::new(normal_color, 0.02));
+        *stroke = traj.normal_stroke(max_costs.max_costs);
 
         *visibility = if traj.feasible {
             Visibility::Inherited
@@ -136,13 +162,13 @@ pub(super) fn update_selected_trajectory(
     let mut ecommands = commands.entity(*entity);
     ecommands.insert(SelectedTrajectory);
 
-    let Ok((selected, mut transform, mut visibility)) = trajectory_q.get_mut(*entity) else {
-        return;
-    };
-    *visibility = Visibility::Visible;
-    transform.translation.z += 10.0;
-    let selected_color = selected.selected_color();
-    ecommands.insert(Stroke::new(selected_color, 0.05));
+    if let Ok((selected, mut transform, mut stroke, mut visibility)) = trajectory_q.get_mut(*entity) {
+        *visibility = Visibility::Visible;
+        transform.translation.z += 10.0;
+        *stroke = selected.selected_stroke(max_costs.max_costs);
+    } else {
+        bevy::log::warn!("could not find selected trajectory {:#?}", entity);
+    }
 }
 
 fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory, impl Bundle) {
@@ -181,8 +207,6 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
     let main_trajectories =
         log::read_main_log(&main_trajectories_path).expect("could not read trajectory logs");
     let (mtraj_res, mtraj_bundle) = make_main_trajectory_bundle(&main_trajectories);
-
-    commands.insert_resource(mtraj_res);
 
     commands.spawn(mtraj_bundle);
 
@@ -251,8 +275,6 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                         if let Some(bundle) = make_trajectory_bundle(&tl) {
                             sender.send((tl.time_step, bundle))?;
                         }
-
-                        // bevy::log::info!("len={}", buf.len());
                     }
                     drop(sender);
                     Ok(())
@@ -261,84 +283,172 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
         task.detach();
     }
 
-    /*
-    while rdr.read_record(&mut sr).unwrap() {
-        let task = io_pool.spawn({
-            let sr = sr.clone();
-            let headers = headers.clone();
-            let sender = sender.clone();
-            async move {
-                let tl: TrajectoryLog = sr.deserialize(Some(&headers)).unwrap();
-                if let Some(bundle) = make_trajectory_bundle(&tl) {
-                    sender.send((tl.time_step, bundle)).unwrap();
-                }
-                drop(sender);
-                ()
-            }
-        });
-        task.detach();
-        // let res = futures_lite::future::block_on(task);
-        // dbg!(res);
-    }
-    */
 
     drop(sender);
 
-    let _inserter = io_pool.scope(|s| {
-        s.spawn({
-            async move {
-                let mut ts_map = BTreeMap::new();
-                for (ts, (bundle, extra_bundle)) in receiver.iter() {
-                    //bevy::log::info!("received one");
-                    let ts_entity = ts_map.entry(ts).or_insert_with(|| {
-                        commands
-                            .spawn((
-                                Name::new(format!("trajectory group ts={}", ts)),
-                                TrajectoryGroup { time_step: ts },
-                                SpatialBundle::default(),
-                            ))
-                            .id()
-                    });
-                    let mut entity = commands.spawn(bundle);
-                    entity.set_parent(*ts_entity);
-                    if let Some(extra) = extra_bundle {
-                        entity.insert(extra);
-                    }
-                }
-                bevy::log::info!("done");
-            }
+    let mut max_costs = f64::MIN_POSITIVE;
+    let mut ts_map = BTreeMap::new();
+    for (ts, (bundle, extra_bundle, costs)) in receiver.iter() {
+        //bevy::log::info!("received one");
+        let ts_entity = ts_map.entry(ts).or_insert_with(|| {
+            commands
+                .spawn((
+                    Name::new(format!("trajectory group ts={}", ts)),
+                    TrajectoryGroup { time_step: ts },
+                    SpatialBundle::default(),
+                ))
+                .id()
         });
-    });
-
-    // let res = rdr.deserialize().collect::<Result<Vec<_>, _>>()?;
-    /*
-    let pool = bevy::tasks::AsyncComputeTaskPool::get();
-
-    let trajectories_path = std::path::Path::join(&args.logs, "trajectories.csv");
-    let trajectories = {
-        let mut v = read_log(&trajectories_path).expect("could not read trajectory logs");
-        v.sort_by_key(|t| t.time_step);
-        v
-    };
-
-    use itertools::Itertools;
-
-    for (ts, traj_group) in &trajectories.into_iter().group_by(|t| t.time_step) {
-        let ts_entity = commands.spawn((
-            Name::new(format!("trajectory group ts={}", ts)),
-            TrajectoryGroup { time_step: ts },
-            SpatialBundle::default(),
-        )).id();
-
-        for traj in traj_group {
-            let Some(bundle) = make_trajectory_bundle(&traj) else {
-                bevy::log::warn!("skipping invalid trajectory");
-                continue;
-            };
-            commands.spawn(bundle).set_parent(ts_entity);
+        let mut entity = commands.spawn(bundle);
+        entity.set_parent(*ts_entity);
+        if let Some(extra) = extra_bundle {
+            entity.insert(extra);
+        }
+        if costs > max_costs {
+            max_costs = costs;
         }
     }
-    */
+    bevy::log::info!("done");
+
+
+    commands.insert_resource(MaxCosts { max_costs });
+
+    let ego_width = 1.941;
+    let ego_length = 4.973;
+
+    let rect = bevy_prototype_lyon::shapes::Rectangle {
+        extents: Vec2::new(ego_length, ego_width),
+        origin: RectangleOrigin::Center,
+    };
+    let wheelbase_marker = bevy_prototype_lyon::shapes::Rectangle {
+        extents: Vec2::new(0.2, ego_width),
+        origin: RectangleOrigin::Center,
+    };
+
+    for (ts, ts_group) in ts_map.iter() {
+        let ts_idx = *ts as usize;
+        let pos = mtraj_res.kinematic_data.positions().nth(ts_idx).unwrap();
+
+        let rear_wheelbase = Vec3::new(-1.247, 0.0, 1.0);
+        let front_wheelbase = Vec3::new(1.724, 0.0, 1.0);
+        let wheel_marker = bevy_prototype_lyon::shapes::Rectangle {
+            extents: Vec2::new(0.8, 0.25),
+            origin: RectangleOrigin::Center,
+        };
+        commands.spawn((
+                Name::new("ego obstacle"),
+                ShapeBundle {
+                    path: GeometryBuilder::build_as(&rect),
+                    transform: {
+                        let theta = *mtraj_res.kinematic_data.theta_orientations_rad.get(ts_idx).unwrap();
+                        let rotation = Quat::from_rotation_z(theta);
+
+                        let orientation_transform0 = Transform::from_rotation(rotation);
+                        let mut orientation_transform = Transform::default();
+                        // orientation_transform.translation += rear_wheelbase;
+                        orientation_transform.rotate(rotation);
+                        // orientation_transform.translation -= rear_wheelbase;
+                        let mut pos_transform  = Transform::from_translation(pos.extend(20.0));
+                        let transform = pos_transform
+                            .mul_transform(orientation_transform);
+                        transform
+                    },
+
+                    ..default()
+                },
+                // super::HoverTooltip::bundle("Ego Vehicle"),
+                Fill::color(Color::WHITE),
+                Stroke::new(Color::ORANGE_RED, 0.1),
+            ))
+            .set_parent(*ts_group)
+            .with_children(|builder| {
+                builder
+                    .spawn((
+                        Name::new("rear wheelbase marker"),
+                        ShapeBundle {
+                            path: GeometryBuilder::build_as(&wheelbase_marker),
+                            transform: {
+                                Transform::from_translation(rear_wheelbase)
+                            },
+                            ..default()
+                        },
+                        Fill::color(Color::GRAY),
+                        super::HoverTooltip::bundle("Rear Wheelbase"),
+                    )).with_children(|builder| {
+                        builder.spawn((
+                            Name::new("left rear wheel"),
+                            ShapeBundle {
+                                path: GeometryBuilder::build_as(&wheel_marker),
+                                transform: {
+                                    Transform::from_translation(Vec3::new(0.0, ego_width / 2.0, 0.5))
+                                },
+                                ..default()
+                            },
+                            Fill::color(Color::DARK_GRAY),
+                        ));
+                        builder.spawn((
+                            Name::new("right rear wheel"),
+                            ShapeBundle {
+                                path: GeometryBuilder::build_as(&wheel_marker),
+                                transform: {
+                                    Transform::from_translation(Vec3::new(0.0, -ego_width / 2.0, 0.5))
+                                },
+                                ..default()
+                            },
+                            Fill::color(Color::DARK_GRAY),
+                        ));
+                    });
+                builder
+                    .spawn((
+                        Name::new("front wheelbase marker"),
+                        ShapeBundle {
+                            path: GeometryBuilder::build_as(&wheelbase_marker),
+                            transform: {
+                                Transform::from_translation(front_wheelbase)
+                            },
+                            ..default()
+                        },
+                        Fill::color(Color::GRAY),
+                        super::HoverTooltip::bundle("Front Wheelbase"),
+                    )).with_children(|builder| {
+                        let wheel_marker = bevy_prototype_lyon::shapes::Rectangle {
+                            extents: Vec2::new(0.8, 0.25),
+                            origin: RectangleOrigin::Center,
+                        };
+
+                        let curvature = *mtraj_res.kinematic_data.kappa_rad.get(ts_idx).unwrap();
+
+                        builder.spawn((
+                            Name::new("left front wheel"),
+                            ShapeBundle {
+                                path: GeometryBuilder::build_as(&wheel_marker),
+                                transform: {
+                                    let mut transform = Transform::from_translation(Vec3::new(0.0, ego_width / 2.0, 0.5));
+                                    transform.rotate_z(curvature);
+                                    transform
+                                },
+                                ..default()
+                            },
+                            Fill::color(Color::DARK_GRAY),
+                        ));
+                        builder.spawn((
+                            Name::new("right front wheel"),
+                            ShapeBundle {
+                                path: GeometryBuilder::build_as(&wheel_marker),
+                                transform: {
+                                    let mut transform = Transform::from_translation(Vec3::new(0.0, -ego_width / 2.0, 0.5));
+                                    transform.rotate_z(curvature);
+                                    transform
+                                },
+                                ..default()
+                            },
+                            Fill::color(Color::DARK_GRAY),
+                        ));
+                    });
+            });
+    }
+
+    commands.insert_resource(mtraj_res);
 }
 
 pub(crate) fn trajectory_group_visibility(
@@ -971,7 +1081,9 @@ pub(crate) fn sort_trajectory_list(
     };
 
     let key = |entity: &Entity| {
-        let traj = trajectory_q.get(*entity).unwrap();
+        let Ok(traj) = trajectory_q.get(*entity) else {
+            return Finite::MAX;
+        };
 
         let val: Finite<f32> = match *sort_key {
             TrajectorySortKey::ID => Finite::from(traj.unique_id),
@@ -1075,9 +1187,9 @@ pub(crate) fn trajectory_list(
                 header_entry!(TrajectorySortKey::Cost, "Cost");
             })
             .body(|body| {
-                body.rows(18.0, children.len(), |row_index, mut row| {
+                body.rows(18.0, children.len() - 1, |row_index, mut row| {
                     let entity = *children.get(row_index).unwrap();
-                    let (traj, selected, invalid_data) = trajectory_q.get(entity).unwrap();
+                    let Ok((traj, selected, invalid_data)) = trajectory_q.get(entity) else { return; };
                     row.col(|ui| {
                         ui.horizontal(|ui| {
                             let clicked = ui.selectable_label(selected, traj.unique_id.to_string()).clicked();

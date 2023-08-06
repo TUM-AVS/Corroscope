@@ -22,6 +22,7 @@ impl Plugin for ElementsPlugin {
             )
             .add_systems(Update,
                 (
+                        trajectory::update_stroke,
                         trajectory::trajectory_group_visibility,
                         trajectory::trajectory_visibility,
                         trajectory::trajectory_tooltip,
@@ -29,6 +30,7 @@ impl Plugin for ElementsPlugin {
                         obstacle::trajectory_animation,
                         ref_path::ref_path_tooltip,
                         // obstacle::plot_obs,
+                        show_generic_tooltips,
                 )
             )
             .add_systems(Update,
@@ -48,5 +50,45 @@ impl Plugin for ElementsPlugin {
         app.register_type::<trajectory::TrajectoryLog>()
             .register_type::<trajectory::MainLog>()
             .register_type::<trajectory::TrajectoryGroup>();
+    }
+}
+
+
+#[derive(Clone, Component, Reflect)]
+#[component(storage = "SparseSet")]
+pub(crate) struct HoverTooltip {
+    text: String,
+}
+
+impl HoverTooltip {
+    fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+        }
+    }
+
+    fn bundle(text: impl Into<String>) -> impl Bundle {
+        use bevy_mod_picking::prelude::*;
+
+        (
+            On::<Pointer<Over>>::target_insert(HoverTooltip::new(text)),
+            On::<Pointer<Out>>::target_remove::<HoverTooltip>(),
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+        )
+    }
+
+}
+
+pub(crate) fn show_generic_tooltips(mut contexts: bevy_egui::EguiContexts, tooltip_q: Query<(Entity, &HoverTooltip)>) {
+    let ctx = contexts.ctx_mut();
+
+    let base_id = egui::Id::new("ref path tooltip");
+
+    for (entity, tooltip) in tooltip_q.iter() {
+        let id = base_id.with(entity);
+        egui::containers::show_tooltip(ctx, id, |ui| {
+            ui.heading(tooltip.text.clone());
+        });
     }
 }
