@@ -8,7 +8,6 @@ use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use commonroad_pb::CommonRoad;
 
 use prost::Message;
-use std::fs::File;
 use std::io::Read;
 
 use bevy_mod_picking::prelude::*;
@@ -36,7 +35,7 @@ fn main() -> color_eyre::eyre::Result<()> {
     let args = crate::args::Args::parse();
 
     // TODO: Improve file loading error reporting
-    let f = File::open(&args.scenario).unwrap();
+    let f = std::fs::File::open(&args.scenario)?;
     let cr = read_cr(f);
 
     let mut app = App::new();
@@ -44,7 +43,7 @@ fn main() -> color_eyre::eyre::Result<()> {
     app.insert_resource(cr)
         .insert_resource(args)
         .insert_resource(bevy::winit::WinitSettings::desktop_app())
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+        .add_plugins(CustomDefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Corroscope".into(),
                 // present_mode: bevy::window::PresentMode::AutoNoVsync,
@@ -175,3 +174,54 @@ fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
     commonroad_pb::CommonRoad::decode(buf).unwrap()
 }
 
+pub struct CustomDefaultPlugins;
+
+impl PluginGroup for CustomDefaultPlugins {
+    fn build(self) -> bevy::app::PluginGroupBuilder {
+        let mut group = bevy::app::PluginGroupBuilder::start::<Self>();
+        group = group
+            .add(bevy::log::LogPlugin::default())
+            .add(bevy::core::TaskPoolPlugin::default())
+            .add(bevy::core::TypeRegistrationPlugin::default())
+            .add(bevy::core::FrameCountPlugin::default())
+            .add(bevy::time::TimePlugin::default())
+            .add(bevy::transform::TransformPlugin::default())
+            .add(bevy::hierarchy::HierarchyPlugin::default())
+            .add(bevy::diagnostic::DiagnosticsPlugin::default())
+            .add(bevy::input::InputPlugin::default())
+            .add(bevy::window::WindowPlugin::default())
+            .add(bevy::a11y::AccessibilityPlugin);
+
+        {
+            group = group.add(bevy::asset::AssetPlugin::default());
+        }
+
+        {
+            group = group.add(bevy::winit::WinitPlugin::default());
+        }
+
+        {
+            group = group
+                .add(bevy::render::RenderPlugin::default())
+                // NOTE: Load this after renderer initialization so that it knows about the supported
+                // compressed texture formats
+                .add(bevy::render::texture::ImagePlugin::default());
+
+            #[cfg(all(not(target_arch = "wasm32"), feature = "multi-threaded"))]
+            {
+                group = group
+                    .add(bevy::render::pipelined_rendering::PipelinedRenderingPlugin::default());
+            }
+        }
+
+        {
+            group = group.add(bevy::core_pipeline::CorePipelinePlugin::default());
+        }
+
+        {
+            group = group.add(bevy::sprite::SpritePlugin::default());
+        }
+
+        group
+    }
+}
