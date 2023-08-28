@@ -13,6 +13,7 @@ pub(crate) struct TrajectoryPlotData {
     curvilinear_orientation_ref: egui::plot::Line,
     kappa: egui::plot::Line,
     kappa_ref: egui::plot::Line,
+    initial_velocity: f32,
 }
 
 #[derive(Resource, Clone)]
@@ -112,6 +113,8 @@ impl TrajectoryPlotData {
             .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
             .name("reference curvature [1/m]");
 
+        let initial_velocity = plot_data.velocity.first().unwrap()[1] as f32;
+
         Self {
             velocity,
             velocity_ref,
@@ -123,6 +126,7 @@ impl TrajectoryPlotData {
             curvilinear_orientation_ref,
             kappa,
             kappa_ref,
+            initial_velocity,
         }
     }
 }
@@ -131,6 +135,7 @@ pub(crate) fn plot_traj(
     plot_data: TrajectoryPlotData,
     ui: &mut egui::Ui,
     time_step: f32,
+    vparams: &super::VehicleParams,
 ) -> Option<f64> {
     let mut cursor_x = None;
 
@@ -141,15 +146,14 @@ pub(crate) fn plot_traj(
     let plot = |name: &'static str| {
         egui::plot::Plot::new(name)
             .legend(egui::plot::Legend::default().position(egui::plot::Corner::LeftBottom))
-            .allow_drag(false)
-            .allow_zoom(false)
+            // .allow_drag(false)
+            // .allow_zoom(false)
             .view_aspect(2.0)
             .min_size(egui::Vec2::new(150.0, 75.0))
             .sharp_grid_lines(true)
             .include_x(0.0)
             .include_y(0.0)
             .width(plot_width)
-            // .height(250.0)
             .link_cursor(group, true, false)
     };
 
@@ -179,10 +183,8 @@ pub(crate) fn plot_traj(
 
             pui.vline(ts_vline.clone());
 
-            // TODO: Pass from vehicle parameters
-            let v_max = 36;
             pui.hline(
-                egui::plot::HLine::new(v_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+                egui::plot::HLine::new(vparams.v_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }),
             ); // .name("v_max"));
 
             if let Some(pointer) = pui.pointer_coordinate() {
@@ -191,6 +193,11 @@ pub(crate) fn plot_traj(
         });
 
     ui.heading("Acceleration");
+
+    ui.label(egui::RichText::new(
+        "Note: Acceleration limits are calculated using switching velocity and initial velocity"
+    ).weak());
+
     let _acceleration_plot = plot("acceleration_plot")
         .center_y_axis(true)
         .label_formatter(unit_label_formatter("m/s^2"))
@@ -200,8 +207,13 @@ pub(crate) fn plot_traj(
 
             pui.vline(ts_vline.clone());
 
-            // TODO: Pass from vehicle parameters
-            let a_max = 2.5;
+
+            let a_max = if plot_data.initial_velocity > vparams.v_switch  {
+                vparams.a_max * vparams.v_switch / plot_data.initial_velocity
+            } else {
+                vparams.a_max
+            };
+
             pui.hline(
                 egui::plot::HLine::new(a_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }),
             ); //.name("maximum acceleration"));
@@ -257,17 +269,14 @@ pub(crate) fn plot_traj(
     ui.heading("Curvature");
     let _theta_plot = plot("kappa_plot")
         .center_y_axis(true)
-        .label_formatter(angle_label_formatter)
+        .label_formatter(unit_label_formatter("1/m"))
         .show(ui, |pui| {
             pui.line(plot_data.kappa);
             pui.line(plot_data.kappa_ref);
 
             pui.vline(ts_vline.clone());
 
-            // TODO: Pass from vehicle parameters
-            let wheelbase = 2.971;
-            let delta_max = 0.610865;
-            let kappa_max = f64::tan(delta_max) / wheelbase;
+            let kappa_max = f32::tan(vparams.delta_max) / vparams.wheelbase;
 
             pui.hline(
                 egui::plot::HLine::new(kappa_max)

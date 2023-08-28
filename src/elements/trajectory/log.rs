@@ -133,20 +133,27 @@ pub(crate) struct TrajectoryLog {
     pub(crate) inf_kin_yaw_rate: f64,
     pub(crate) inf_kin_acceleration: f64,
     pub(crate) inf_kin_max_curvature: f64,
-    // inf_kin_max_curvature_rate: f64,
+    pub(crate) inf_kin_max_curvature_rate: f64,
 }
 
 impl TrajectoryLog {
-    pub(crate) fn normal_stroke(&self, max_cost: f64) -> Stroke {
-        let mut stroke = Stroke::new(self.color(max_cost), 0.02);
+    fn stroke(color: Color, line_width: f32) -> Stroke {
+        use bevy_prototype_lyon::prelude::*;
+
+        let mut stroke = Stroke::new(color, line_width);
         stroke.options.tolerance = 10.0;
+        // stroke.options.line_join = LineJoin::Round;
+        // stroke.options.start_cap = LineCap::Round;
+        // stroke.options.end_cap = LineCap::Round;
         stroke
     }
 
+    pub(crate) fn normal_stroke(&self, max_cost: f64) -> Stroke {
+        Self::stroke(self.color(max_cost), 0.01)
+    }
+
     pub(crate) fn selected_stroke(&self, max_cost: f64) -> Stroke {
-        let mut stroke = Stroke::new(self.selected_color(max_cost), 0.02);
-        stroke.options.tolerance = 10.0;
-        stroke
+        Self::stroke(self.selected_color(max_cost), 0.02)
     }
 
    pub(crate) fn color(&self, max_cost: f64) -> Color {

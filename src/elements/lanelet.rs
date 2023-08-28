@@ -45,9 +45,8 @@ fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> 
         .iter()
         .map(|p| Vec2::new(p.x as f32, p.y as f32));
 
-    let rb_shape = bevy_prototype_lyon::shapes::Polygon {
+    let rb_shape = crate::extra_shapes::Polyline {
         points: bound_pts.collect(),
-        closed: false,
     };
     let rb_path = GeometryBuilder::build_as(&rb_shape);
 
@@ -57,11 +56,11 @@ fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> 
     let marking_color = Color::CRIMSON;
     let stroke_opts = {
         let mut opts = StrokeOptions::default();
-        opts.start_cap = LineCap::Round;
-        opts.end_cap = LineCap::Round;
-        opts.line_join = LineJoin::Round;
-        opts.line_width = 0.1;
-        opts.tolerance = 1e-3;
+        // opts.start_cap = LineCap::Round;
+        // opts.end_cap = LineCap::Round;
+        // opts.line_join = LineJoin::Round;
+        opts.line_width = 0.06;
+        opts.tolerance = 1.0; //1e-3;
         opts
     };
     let normal_stroke = Stroke {
@@ -80,7 +79,7 @@ fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> 
         color: Color::VIOLET + Color::hsl(0.0, -0.15, -0.35),
         options: {
             let mut opts = stroke_opts;
-            opts.line_width = 0.07;
+            opts.line_width = 0.02;
             opts
         },
     };
@@ -105,7 +104,7 @@ fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> 
     };
 
     let bound_z = 1e-1 + (z_idx * 1e-5);
-    bevy::log::info!("bound_z={}", bound_z);
+    bevy::log::debug!("bound_z={}", bound_z);
     Some((
         ShapeBundle {
             path,
