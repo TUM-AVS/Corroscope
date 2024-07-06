@@ -66,7 +66,10 @@ pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>) {
         Name::new("reference path"),
         ShapeBundle {
             path: GeometryBuilder::build_as(&reference_path_shape),
-            transform: Transform::from_xyz(0.0, 0.0, 1e-3),
+            spatial: SpatialBundle {
+                transform: Transform::from_xyz(0.0, 0.0, 1e-3),
+                ..default()
+            },
             ..default()
         },
         Stroke::new(reference_path_color, 0.1),

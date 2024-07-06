@@ -153,7 +153,8 @@ fn camera_setup(mut commands: Commands) {
     commands
         .spawn((
             MainCamera,
-            RaycastPickCamera::default(),
+            // RaycastPickCamera::default(),
+            RaycastSource::<()>::new_cursor(),
             Camera2dBundle {
                 projection: OrthographicProjection {
                     scale: 0.1, // 0.001,

@@ -1,18 +1,18 @@
 use bevy::prelude::*;
 
-use egui::plot::PlotPoint;
+use egui_plot::PlotPoint;
 
 pub(crate) struct TrajectoryPlotData {
-    velocity: egui::plot::Line,
-    velocity_ref: egui::plot::Line,
-    acceleration: egui::plot::Line,
-    acceleration_ref: egui::plot::Line,
-    orientation: egui::plot::Line,
-    orientation_ref: egui::plot::Line,
-    curvilinear_orientation: egui::plot::Line,
-    curvilinear_orientation_ref: egui::plot::Line,
-    kappa: egui::plot::Line,
-    kappa_ref: egui::plot::Line,
+    velocity: egui_plot::Line,
+    velocity_ref: egui_plot::Line,
+    acceleration: egui_plot::Line,
+    acceleration_ref: egui_plot::Line,
+    orientation: egui_plot::Line,
+    orientation_ref: egui_plot::Line,
+    curvilinear_orientation: egui_plot::Line,
+    curvilinear_orientation_ref: egui_plot::Line,
+    kappa: egui_plot::Line,
+    kappa_ref: egui_plot::Line,
 }
 
 #[derive(Resource, Clone)]
@@ -79,37 +79,37 @@ impl CachedTrajectoryPlotData {
 
 impl TrajectoryPlotData {
     pub(crate) fn from_data(plot_data: &CachedTrajectoryPlotData) -> Self {
-        let velocity = egui::plot::Line::new(plot_data.velocity.clone()).name("velocity [m/s]");
+        let velocity = egui_plot::Line::new(plot_data.velocity.clone()).name("velocity [m/s]");
 
         let velocity_ref =
-            egui::plot::Line::new(plot_data.velocity_ref.clone()).name("reference velocity [m/s]");
+            egui_plot::Line::new(plot_data.velocity_ref.clone()).name("reference velocity [m/s]");
 
-        let acceleration = egui::plot::Line::new(plot_data.acceleration.clone())
+        let acceleration = egui_plot::Line::new(plot_data.acceleration.clone())
             .name("acceleration [m/s\u{00B2}]");
 
-        let acceleration_ref = egui::plot::Line::new(plot_data.acceleration_ref.clone())
+        let acceleration_ref = egui_plot::Line::new(plot_data.acceleration_ref.clone())
             .name("reference acceleration [m/s\u{00B2}]");
 
         let orientation =
-            egui::plot::Line::new(plot_data.orientation.clone()).name("global orientation [rad]");
+            egui_plot::Line::new(plot_data.orientation.clone()).name("global orientation [rad]");
 
-        let orientation_ref = egui::plot::Line::new(plot_data.orientation_ref.clone())
-            .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
+        let orientation_ref = egui_plot::Line::new(plot_data.orientation_ref.clone())
+            .style(egui_plot::LineStyle::Dotted { spacing: 6.0 })
             .name("reference global orientation [rad]");
 
         let curvilinear_orientation =
-            egui::plot::Line::new(plot_data.curvilinear_orientation.clone())
+            egui_plot::Line::new(plot_data.curvilinear_orientation.clone())
                 .name("curvilinear orientation [rad]");
 
         let curvilinear_orientation_ref =
-            egui::plot::Line::new(plot_data.curvilinear_orientation_ref.clone())
-                .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
+            egui_plot::Line::new(plot_data.curvilinear_orientation_ref.clone())
+                .style(egui_plot::LineStyle::Dotted { spacing: 6.0 })
                 .name("reference curvilinear orientation [rad]");
 
-        let kappa = egui::plot::Line::new(plot_data.kappa.clone()).name("curvature [1/m]");
+        let kappa = egui_plot::Line::new(plot_data.kappa.clone()).name("curvature [1/m]");
 
-        let kappa_ref = egui::plot::Line::new(plot_data.kappa_ref.clone())
-            .style(egui::plot::LineStyle::Dotted { spacing: 6.0 })
+        let kappa_ref = egui_plot::Line::new(plot_data.kappa_ref.clone())
+            .style(egui_plot::LineStyle::Dotted { spacing: 6.0 })
             .name("reference curvature [1/m]");
 
         Self {
@@ -139,8 +139,8 @@ pub(crate) fn plot_traj(
     let plot_width = ui.available_width();
 
     let plot = |name: &'static str| {
-        egui::plot::Plot::new(name)
-            .legend(egui::plot::Legend::default().position(egui::plot::Corner::LeftBottom))
+        egui_plot::Plot::new(name)
+            .legend(egui_plot::Legend::default().position(egui_plot::Corner::LeftBottom))
             .allow_drag(false)
             .allow_zoom(false)
             .view_aspect(2.0)
@@ -163,13 +163,13 @@ pub(crate) fn plot_traj(
         }
     };
 
-    let ts_vline = egui::plot::VLine::new(time_step)
+    let ts_vline = egui_plot::VLine::new(time_step)
         // .name("current time step")
-        .style(egui::plot::LineStyle::Dotted { spacing: 0.1 });
+        .style(egui_plot::LineStyle::Dotted { spacing: 0.1 });
 
     ui.heading("Velocity");
     let _velocity_plot = plot("velocity_plot")
-        .y_grid_spacer(egui::plot::uniform_grid_spacer(|_grid_input| {
+        .y_grid_spacer(egui_plot::uniform_grid_spacer(|_grid_input| {
             [10.0, 2.0, 0.5]
         }))
         .label_formatter(unit_label_formatter("m/s"))
@@ -182,7 +182,7 @@ pub(crate) fn plot_traj(
             // TODO: Pass from vehicle parameters
             let v_max = 36;
             pui.hline(
-                egui::plot::HLine::new(v_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+                egui_plot::HLine::new(v_max).style(egui_plot::LineStyle::Dashed { length: 10.0 }),
             ); // .name("v_max"));
 
             if let Some(pointer) = pui.pointer_coordinate() {
@@ -203,11 +203,11 @@ pub(crate) fn plot_traj(
             // TODO: Pass from vehicle parameters
             let a_max = 2.5;
             pui.hline(
-                egui::plot::HLine::new(a_max).style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+                egui_plot::HLine::new(a_max).style(egui_plot::LineStyle::Dashed { length: 10.0 }),
             ); //.name("maximum acceleration"));
             pui.hline(
-                egui::plot::HLine::new(-a_max)
-                    .style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+                egui_plot::HLine::new(-a_max)
+                    .style(egui_plot::LineStyle::Dashed { length: 10.0 }),
             ); //.name("minimum acceleration"));
 
             if let Some(pointer) = pui.pointer_coordinate() {
@@ -270,12 +270,12 @@ pub(crate) fn plot_traj(
             let kappa_max = f64::tan(delta_max) / wheelbase;
 
             pui.hline(
-                egui::plot::HLine::new(kappa_max)
-                    .style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+                egui_plot::HLine::new(kappa_max)
+                    .style(egui_plot::LineStyle::Dashed { length: 10.0 }),
             );
             pui.hline(
-                egui::plot::HLine::new(-kappa_max)
-                    .style(egui::plot::LineStyle::Dashed { length: 10.0 }),
+                egui_plot::HLine::new(-kappa_max)
+                    .style(egui_plot::LineStyle::Dashed { length: 10.0 }),
             );
 
             if let Some(pointer) = pui.pointer_coordinate() {

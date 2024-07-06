@@ -9,7 +9,7 @@ use bevy_prototype_lyon::prelude::*;
 use crate::commonroad_pb;
 
 use crate::commonroad_pb::{integer_exact_or_interval, CommonRoad};
-use egui::plot::PlotPoints;
+use egui_plot::PlotPoints;
 
 fn state_transform(state: &commonroad_pb::State) -> Option<Transform> {
     let position: Vec2 = match state.position.as_ref()? {
@@ -118,12 +118,14 @@ pub fn spawn_obstacle(
             ObstacleData(obs.to_owned()),
             ShapeBundle {
                 path: rect_path,
-                transform: {
-                    let mut t = state_transform(&obs.initial_state).unwrap();
-                    t.translation.z = 4.0;
-                    t
+                spatial: SpatialBundle {
+                    transform: {
+                        let mut t = state_transform(&obs.initial_state).unwrap();
+                        t.translation.z = 4.0;
+                        t
+                    },
+                    ..default()
                 },
-
                 ..default()
             },
             Fill::color(Color::WHITE),
@@ -172,14 +174,17 @@ pub fn spawn_obstacle(
                 Name::new(format!("trajectory prediction for t={}", time_step)),
                 ShapeBundle {
                     path: GeometryBuilder::build_as(&simple_marker),
-                    transform: state_transform(st)
-                        .unwrap()
-                        .mul_transform(Transform::from_xyz(
-                            0.0,
-                            0.0,
-                            0.5 - (time_step as f32 * 1e-7),
-                        ))
-                        .with_scale(Vec3::splat(1e-3)),
+                    spatial: SpatialBundle {
+                        transform: state_transform(st)
+                            .unwrap()
+                            .mul_transform(Transform::from_xyz(
+                                0.0,
+                                0.0,
+                                0.5 - (time_step as f32 * 1e-7),
+                            ))
+                            .with_scale(Vec3::splat(1e-3)),
+                        ..default()
+                    },
                     ..default()
                 },
                 Fill::color(ts_color),
@@ -286,21 +291,21 @@ pub fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
     let ctx = contexts.ctx_mut();
 
     egui::Window::new("Obstacle Velocity").show(ctx, |ui| {
-        egui::plot::Plot::new("velocity_plot")
+        egui_plot::Plot::new("velocity_plot")
             // .clamp_grid(true)
-            .legend(egui::plot::Legend::default())
+            .legend(egui_plot::Legend::default())
             .view_aspect(2.0)
             .min_size(egui::Vec2::new(400.0, 200.0))
             .sharp_grid_lines(true)
             .show(ui, |pui| {
                 for obs in &cr.dynamic_obstacles {
                     let pp = velocity_points(obs).unwrap();
-                    let line = egui::plot::Line::new(pp)
+                    let line = egui_plot::Line::new(pp)
                         .name(format!("velocity [m/s] for {}", obs.dynamic_obstacle_id));
                     pui.line(line);
 
                     let npp = numerical_velocity_points(obs).unwrap();
-                    let nline = egui::plot::Line::new(npp).name(format!(
+                    let nline = egui_plot::Line::new(npp).name(format!(
                         "numerical velocity [m/s] for {}",
                         obs.dynamic_obstacle_id
                     ));

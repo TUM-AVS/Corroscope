@@ -99,7 +99,10 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
         traj.to_owned(),
         ShapeBundle {
             path: GeometryBuilder::build_as(&traj_shape),
-            transform: Transform::from_xyz(0.0, 0.0, traj_z),
+            spatial: SpatialBundle {
+                transform: Transform::from_xyz(0.0, 0.0, traj_z),
+                ..default()
+            },
             ..default()
         },
         traj.normal_stroke(100.0),
@@ -194,7 +197,10 @@ fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory
             Name::new("main trajectory"),
             ShapeBundle {
                 path: GeometryBuilder::build_as(&traj_shape),
-                transform: Transform::from_xyz(0.0, 0.0, 0.5),
+                spatial: SpatialBundle {
+                    transform: Transform::from_xyz(0.0, 0.0, 0.5),
+                    ..default()
+                },
                 ..default()
             },
             Stroke::new(Color::rgba(0.4, 0.6, 0.18, 0.7), 0.15),
@@ -339,21 +345,23 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                 Name::new("ego obstacle"),
                 ShapeBundle {
                     path: GeometryBuilder::build_as(&rect),
-                    transform: {
-                        let theta = *mtraj_res.kinematic_data.theta_orientations_rad.get(ts_idx).unwrap();
-                        let rotation = Quat::from_rotation_z(theta);
+                    spatial: SpatialBundle {
+                        transform: {
+                            let theta = *mtraj_res.kinematic_data.theta_orientations_rad.get(ts_idx).unwrap();
+                            let rotation = Quat::from_rotation_z(theta);
 
-                        let orientation_transform0 = Transform::from_rotation(rotation);
-                        let mut orientation_transform = Transform::default();
-                        // orientation_transform.translation += rear_wheelbase;
-                        orientation_transform.rotate(rotation);
-                        // orientation_transform.translation -= rear_wheelbase;
-                        let mut pos_transform  = Transform::from_translation(pos.extend(20.0));
-                        let transform = pos_transform
-                            .mul_transform(orientation_transform);
-                        transform
+                            let orientation_transform0 = Transform::from_rotation(rotation);
+                            let mut orientation_transform = Transform::default();
+                            // orientation_transform.translation += rear_wheelbase;
+                            orientation_transform.rotate(rotation);
+                            // orientation_transform.translation -= rear_wheelbase;
+                            let mut pos_transform  = Transform::from_translation(pos.extend(20.0));
+                            let transform = pos_transform
+                                .mul_transform(orientation_transform);
+                            transform
+                        },
+                        ..default()
                     },
-
                     ..default()
                 },
                 // super::HoverTooltip::bundle("Ego Vehicle"),
@@ -367,8 +375,11 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                         Name::new("rear wheelbase marker"),
                         ShapeBundle {
                             path: GeometryBuilder::build_as(&wheelbase_marker),
-                            transform: {
-                                Transform::from_translation(rear_wheelbase)
+                            spatial: SpatialBundle {
+                                transform: {
+                                    Transform::from_translation(rear_wheelbase)
+                                },
+                                ..default()
                             },
                             ..default()
                         },
@@ -379,8 +390,11 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                             Name::new("left rear wheel"),
                             ShapeBundle {
                                 path: GeometryBuilder::build_as(&wheel_marker),
-                                transform: {
-                                    Transform::from_translation(Vec3::new(0.0, ego_width / 2.0, 0.5))
+                                spatial: SpatialBundle {
+                                    transform: {
+                                        Transform::from_translation(Vec3::new(0.0, ego_width / 2.0, 0.5))
+                                    },
+                                    ..default()
                                 },
                                 ..default()
                             },
@@ -390,8 +404,11 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                             Name::new("right rear wheel"),
                             ShapeBundle {
                                 path: GeometryBuilder::build_as(&wheel_marker),
-                                transform: {
-                                    Transform::from_translation(Vec3::new(0.0, -ego_width / 2.0, 0.5))
+                                spatial: SpatialBundle {
+                                    transform: {
+                                        Transform::from_translation(Vec3::new(0.0, -ego_width / 2.0, 0.5))
+                                    },
+                                    ..default()
                                 },
                                 ..default()
                             },
@@ -403,8 +420,11 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                         Name::new("front wheelbase marker"),
                         ShapeBundle {
                             path: GeometryBuilder::build_as(&wheelbase_marker),
-                            transform: {
-                                Transform::from_translation(front_wheelbase)
+                            spatial: SpatialBundle {
+                                transform: {
+                                    Transform::from_translation(front_wheelbase)
+                                },
+                                ..default()
                             },
                             ..default()
                         },
@@ -422,10 +442,13 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                             Name::new("left front wheel"),
                             ShapeBundle {
                                 path: GeometryBuilder::build_as(&wheel_marker),
-                                transform: {
-                                    let mut transform = Transform::from_translation(Vec3::new(0.0, ego_width / 2.0, 0.5));
-                                    transform.rotate_z(curvature);
-                                    transform
+                                spatial: SpatialBundle {
+                                    transform: {
+                                        let mut transform = Transform::from_translation(Vec3::new(0.0, ego_width / 2.0, 0.5));
+                                        transform.rotate_z(curvature);
+                                        transform
+                                    },
+                                    ..default()
                                 },
                                 ..default()
                             },
@@ -435,10 +458,13 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                             Name::new("right front wheel"),
                             ShapeBundle {
                                 path: GeometryBuilder::build_as(&wheel_marker),
-                                transform: {
-                                    let mut transform = Transform::from_translation(Vec3::new(0.0, -ego_width / 2.0, 0.5));
-                                    transform.rotate_z(curvature);
-                                    transform
+                                spatial: SpatialBundle {
+                                    transform: {
+                                        let mut transform = Transform::from_translation(Vec3::new(0.0, -ego_width / 2.0, 0.5));
+                                        transform.rotate_z(curvature);
+                                        transform
+                                    },
+                                    ..default()
                                 },
                                 ..default()
                             },
@@ -885,7 +911,7 @@ pub(crate) fn trajectory_window(
         .resizable(true)
         .show(ctx, |ui| {
             egui::ScrollArea::vertical()
-                .max_width(500.0 - ctx.style().spacing.scroll_bar_width - 8.0)
+                .max_width(500.0 - ctx.style().spacing.scroll.bar_width - 8.0)
                 .scroll_bar_visibility(
                     egui::containers::scroll_area::ScrollBarVisibility::AlwaysVisible,
                 )
@@ -953,8 +979,11 @@ pub(crate) fn trajectory_window(
                                     PointerTimeStep::default(),
                                     ShapeBundle {
                                         path: GeometryBuilder::build_as(&pointer_shape),
-                                        transform: Transform::from_translation(pos.extend(100.0))
-                                            .with_scale(Vec3::splat(1e-4)),
+                                        spatial: SpatialBundle {
+                                            transform: Transform::from_translation(pos.extend(100.0))
+                                                .with_scale(Vec3::splat(1e-4)),
+                                            ..default()
+                                        },
                                         ..default()
                                     },
                                     Fill::color(Color::ORANGE_RED.with_a(0.6)),

@@ -109,7 +109,10 @@ fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> 
     Some((
         ShapeBundle {
             path,
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, bound_z)),
+            spatial: SpatialBundle {
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, bound_z)),
+                ..default()
+            },
             ..default()
         },
         stroke,
@@ -129,7 +132,10 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet, 
             Name::new("stop line"),
             ShapeBundle {
                 path: GeometryBuilder::build_as(&stop_line_shape),
-                transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                spatial: SpatialBundle {
+                    transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                    ..default()
+                },
                 ..default()
             },
             Fill::color(Color::BLACK),
@@ -162,7 +168,10 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet, 
             LaneletBackground,
             ShapeBundle {
                 path: GeometryBuilder::build_as(&ll_shape),
-                transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                spatial: SpatialBundle {
+                    transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                    ..default()
+                },
                 ..default()
             },
             Fill::color(Color::GRAY),
