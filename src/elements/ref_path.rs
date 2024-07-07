@@ -25,9 +25,9 @@ pub fn ref_path_tooltip(mut contexts: bevy_egui::EguiContexts, ref_path_q: Query
 }
 
 fn read_ref_path(path: &std::path::Path) -> Result<RefPath, Box<dyn std::error::Error>> {
-    let file = std::fs::File::open(path).unwrap();
+    let file = std::fs::File::open(path)?;
 
-    let data: RefPath = serde_json::from_reader(file).unwrap();
+    let data: RefPath = serde_json::from_reader(file)?;
 
     for window in data.points.as_slice().windows(2) {
         let [w1, w2] = window else { unreachable!() };
@@ -44,7 +44,13 @@ fn read_ref_path(path: &std::path::Path) -> Result<RefPath, Box<dyn std::error::
 }
 
 pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>) {
-    let rp = read_ref_path(&args.reference_path).unwrap();
+    let rp = match read_ref_path(&args.reference_path) {
+        Ok(rp) => rp,
+        Err(e) => {
+            bevy::log::error!("Failed to read reference path: {}", e);
+            return;
+        }
+    };
 
     let points = rp
         .points
