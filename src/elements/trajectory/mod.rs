@@ -574,10 +574,10 @@ pub(crate) fn trajectory_tooltip(
                     "inf_kin_max_curvature: {}",
                     traj.inf_kin_max_curvature
                 ));
-                //ui.label(format!(
-                //    "inf_kin_max_curvature_rate: {}",
-                //    traj.inf_kin_max_curvature_rate
-                //));
+                ui.label(format!(
+                    "inf_kin_max_curvature_rate: {}",
+                    traj.inf_kin_max_curvature_rate
+                ));
                 // plot_traj(traj, ui, cts.dynamic_time_step.round());
             }
         },
@@ -719,16 +719,18 @@ fn trajectory_description(
                             });
                         });
                     });
-                    body.row(15.0, |mut row| {
-                        row.col(|ui| {
-                            ui.label("trajectory length:");
-                        });
-                        row.col(|ui| {
-                            ui.with_layout(value_cell_layout, |ui| {
-                                rich_label!(ui, traj.actual_traj_length, "{} m");
+                    /*
+                        body.row(15.0, |mut row| {
+                            row.col(|ui| {
+                                ui.label("trajectory length:");
+                            });
+                            row.col(|ui| {
+                                ui.with_layout(value_cell_layout, |ui| {
+                                    rich_label!(ui, traj.actual_traj_length, "{} m");
+                                });
                             });
                         });
-                    });
+                     */ 
                 });
         });
     };
@@ -869,6 +871,7 @@ fn trajectory_description(
                             inf_row!(inf_kin_yaw_rate);
                             inf_row!(inf_kin_acceleration);
                             inf_row!(inf_kin_max_curvature);
+                            inf_row!(inf_kin_max_curvature_rate);
                         });
                 });
 

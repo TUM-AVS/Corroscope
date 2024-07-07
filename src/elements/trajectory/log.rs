@@ -27,12 +27,11 @@ where
         .map_err(D::Error::custom)
 }
 
-#[allow(non_snake_case)]
 #[derive(Debug, serde::Deserialize, Clone, Default, Reflect)]
 pub(crate) struct Costs {
-    Occ_PM_cost: f64,
-    Occ_UM_cost: f64,
-    Occ_VE_cost: f64,
+    occ_pm_cost: f64,
+    occ_um_cost: f64,
+    occ_ve_cost: f64,
     acceleration_cost: f64,
     distance_to_obstacles_cost: f64,
     distance_to_reference_path_cost: f64,
@@ -115,7 +114,7 @@ pub(crate) struct TrajectoryLog {
     pub(crate) feasible: bool,
     pub(crate) horizon: f64,
     pub(crate) dt: f64,
-    pub(crate) actual_traj_length: f64,
+    // pub(crate) actual_traj_length: f64,
 
     #[serde(flatten)]
     pub(crate) kinematic_data: KinematicData,
@@ -133,7 +132,7 @@ pub(crate) struct TrajectoryLog {
     pub(crate) inf_kin_yaw_rate: f64,
     pub(crate) inf_kin_acceleration: f64,
     pub(crate) inf_kin_max_curvature: f64,
-    // inf_kin_max_curvature_rate: f64,
+    pub(crate) inf_kin_max_curvature_rate: f64,
 }
 
 impl TrajectoryLog {
@@ -250,7 +249,8 @@ pub struct MainLog {
     #[serde(deserialize_with = "deserialize_bool")]
     pub(crate) optimal_trajectory: bool,
     pub(crate) percentage_feasible_traj: Option<f64>,
-    pub(crate) infeasible_kinematics_sum: f64,
+    // pub(crate) infeasible_kinematics_sum: f64,
+    pub(crate) infeasible_sum: f64,
     pub(crate) inf_kin_acceleration: f64,
     pub(crate) inf_kin_negative_s_velocity: f64,
     pub(crate) inf_kin_max_s_idx: f64,
@@ -260,7 +260,7 @@ pub struct MainLog {
     pub(crate) inf_kin_max_curvature_rate: f64,
     pub(crate) inf_kin_vehicle_acc: f64,
     pub(crate) inf_cartesian_transform: f64,
-    pub(crate) infeasible_collision: f64,
+    // pub(crate) infeasible_collision: f64,
 
     #[serde(flatten)]
     pub(crate) kinematic_data: KinematicData,
