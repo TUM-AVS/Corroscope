@@ -92,7 +92,7 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
     };
 
     let traj_z = 24.0 + (traj.unique_id as f32) * 1e-6;
-    bevy::log::info!("using traj_z={}", traj_z);
+    bevy::log::debug!("using traj_z={}", traj_z);
 
     let base_bundle = (
         Name::new(format!("trajectory {}", traj.trajectory_number)),
@@ -159,7 +159,7 @@ pub(super) fn update_selected_trajectory(
         };
     }
 
-    let SelectTrajectoryEvent(entity) = selection_events.iter().last().unwrap();
+    let SelectTrajectoryEvent(entity) = selection_events.read().last().unwrap();
     bevy::log::debug!("handling selection for entity {:?}", entity);
 
     let mut ecommands = commands.entity(*entity);
@@ -210,15 +210,22 @@ fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory
 
 pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) {
     let main_trajectories_path = std::path::Path::join(&args.logs, "logs.csv");
-    let main_trajectories =
-        log::read_main_log(&main_trajectories_path).expect("could not read trajectory logs");
+    let main_trajectories = match log::read_main_log(&main_trajectories_path) {
+        Ok(trajectories) => trajectories,
+        Err(e) => {
+            bevy::log::error!("could not read trajectory logs (continuing anyway): {}", e);
+            return;
+        },
+    };
     let (mtraj_res, mtraj_bundle) = make_main_trajectory_bundle(&main_trajectories);
 
     commands.spawn(mtraj_bundle);
 
     let trajectories_path = std::path::Path::join(&args.logs, "trajectories.csv");
-    // let io_pool = bevy::tasks::AsyncComputeTaskPool::get();
-    let io_pool = bevy::tasks::TaskPoolBuilder::new().num_threads(8).build();
+    let io_pool = bevy::tasks::TaskPoolBuilder::new()
+        .num_threads(8)
+        .thread_name("trajectory builder".to_string())
+        .build();
 
     let file = std::fs::File::open(trajectories_path).unwrap();
 
@@ -240,7 +247,9 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
 
     let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-    let reader_task = io_pool.spawn({
+    type Task = bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send + Sync>>>;
+
+    let reader_task: Task = io_pool.spawn({
         let buf = buf.clone();
         let done = done.clone();
 
@@ -248,36 +257,51 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
             while !rdr.is_done() {
                 match buf.push_ref() {
                     Ok(mut bref) => {
-                        rdr.read_record(&mut bref).unwrap();
+                        rdr.read_record(&mut bref)?;
                     }
                     Err(_) => {
+                        bevy::log::debug!("failed to push, sleeping");
                         std::thread::sleep(std::time::Duration::from_micros(100));
                         continue;
                     }
                 };
             }
+            bevy::log::debug!("finished reading records");
             done.store(true, std::sync::atomic::Ordering::Relaxed);
+            Ok(())
         }
     });
 
-    reader_task.detach();
+    let mut task_list: Vec<_> = vec![reader_task];
+
     for _ in 0..6 {
-        //let done = done.
         let done = done.clone();
         let buf = buf.clone();
         let headers = headers.clone();
         let sender = sender.clone();
 
-        let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send + Sync>>> = io_pool
+        let task: Task = io_pool
             .spawn({
                 async move {
                     while !done.load(std::sync::atomic::Ordering::Relaxed) {
-                        let Some(next) = buf.pop_ref() else {
+                        let Some(record) = buf.pop_ref() else {
+                            bevy::log::debug!("failed to pop record, yielding");
                             std::thread::yield_now();
                             continue;
                         };
 
-                        let tl: TrajectoryLog = next.deserialize(Some(&headers))?; //map_err(Box::new).map_err(std::sync::Arc::new)?;
+                        if record.is_empty() {
+                            continue;
+                        }
+
+                        let tl = match record.deserialize(Some(&headers)) {
+                            Ok(tl) => tl,
+                            Err(e) => {
+                                bevy::log::error!("error deserializing record, skipping: {} (contents: {:#?})", e, record);
+                                continue;
+                            }
+                        };
+
                         if let Some(bundle) = make_trajectory_bundle(&tl) {
                             sender.send((tl.time_step, bundle))?;
                         }
@@ -286,16 +310,14 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                     Ok(())
                 }
             });
-        task.detach();
+        task_list.push(task);
     }
-
 
     drop(sender);
 
     let mut max_costs = f64::MIN_POSITIVE;
     let mut ts_map = BTreeMap::new();
     for (ts, (bundle, extra_bundle, costs)) in receiver.iter() {
-        //bevy::log::info!("received one");
         let ts_entity = ts_map.entry(ts).or_insert_with(|| {
             commands
                 .spawn((
@@ -314,10 +336,14 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
             max_costs = costs;
         }
     }
-    bevy::log::info!("done");
-
 
     commands.insert_resource(MaxCosts { max_costs });
+
+    for task in task_list.into_iter() {
+        bevy::tasks::block_on(async { task.await })
+            .expect("error running deserialization task");
+    }
+
 
     let ego_width = 1.941;
     let ego_length = 4.973;
@@ -332,8 +358,13 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
     };
 
     for (ts, ts_group) in ts_map.iter() {
+        let _span = bevy::log::debug_span!("processing trajectory time step", time_step=ts).entered();
+
         let ts_idx = *ts as usize;
-        let pos = mtraj_res.kinematic_data.positions().nth(ts_idx).unwrap();
+        let Some(pos) = mtraj_res.kinematic_data.positions().nth(ts_idx) else {
+            bevy::log::error!("failed to add main trajectory data for ts={}", ts);
+            continue;
+        };
 
         let rear_wheelbase = Vec3::new(-1.247, 0.0, 1.0);
         let front_wheelbase = Vec3::new(1.724, 0.0, 1.0);

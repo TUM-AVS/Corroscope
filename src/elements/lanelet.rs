@@ -105,7 +105,7 @@ fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> 
     };
 
     let bound_z = 1e-1 + (z_idx * 1e-5);
-    bevy::log::info!("bound_z={}", bound_z);
+    bevy::log::debug!("bound_z={}", bound_z);
     Some((
         ShapeBundle {
             path,
