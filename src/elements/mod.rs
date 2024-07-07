@@ -74,7 +74,7 @@ impl HoverTooltip {
             On::<Pointer<Over>>::target_insert(HoverTooltip::new(text)),
             On::<Pointer<Out>>::target_remove::<HoverTooltip>(),
             PickableBundle::default(),
-            RaycastPickTarget::default(),
+            // RaycastPickTarget::default(),
         )
     }
 

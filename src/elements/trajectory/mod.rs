@@ -115,7 +115,7 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
         On::<Pointer<Over>>::target_insert(HoveredTrajectory),
         On::<Pointer<Out>>::target_remove::<HoveredTrajectory>(),
         PickableBundle::default(),
-        RaycastPickTarget::default(),
+        // RaycastPickTarget::default(),
     );
 
     let extra_bundle = if traj.costs.values().any(|v| !v.is_finite()) {

@@ -131,7 +131,7 @@ pub fn spawn_obstacle(
             Fill::color(Color::WHITE),
             Stroke::new(Color::ORANGE, 0.2),
             PickableBundle::default(),
-            RaycastPickTarget::default(),
+            // RaycastPickTarget::default(),
             On::<Pointer<Down>>::target_commands_mut(|_click, _commands| {
                 bevy::log::info!("clicked obstacle!");
             }),

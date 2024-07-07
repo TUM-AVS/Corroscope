@@ -80,7 +80,7 @@ pub fn spawn_ref_path(mut commands: Commands, args: Res<crate::args::Args>) {
         },
         Stroke::new(reference_path_color, 0.1),
         PickableBundle::default(),
-        RaycastPickTarget::default(),
+        // RaycastPickTarget::default(),
         On::<Pointer<Over>>::target_insert(HoveredRefPath),
         On::<Pointer<Out>>::target_remove::<HoveredRefPath>(),
     ));

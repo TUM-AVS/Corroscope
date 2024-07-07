@@ -1,3 +1,4 @@
+use backends::raycast::bevy_mod_raycast::deferred::RaycastSource;
 use bevy::prelude::*;
 
 #[cfg(feature = "editor")]
