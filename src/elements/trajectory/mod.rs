@@ -73,6 +73,7 @@ pub(super) fn update_stroke(
     if !max_costs.is_changed() {
         return;
     }
+    bevy::log::info!("resetting Stroke");
 
     for (traj, mut stroke) in trajectory_q.iter_mut() {
         *stroke = traj.normal_stroke(max_costs.max_costs);
@@ -86,9 +87,8 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
         return None;
     }
 
-    let traj_shape: shapes::Polygon = bevy_prototype_lyon::shapes::Polygon {
-        points,
-        closed: false,
+    let traj_shape = crate::extra_shapes::Polyline {
+        points
     };
 
     let traj_z = 24.0 + (traj.unique_id as f32) * 1e-6;
@@ -127,6 +127,46 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
     Some((base_bundle, extra_bundle, traj.costs_cumulative_weighted))
 }
 
+use bevy_polyline::prelude::*;
+
+fn make_polyline_trajectory_bundle(
+    traj: &TrajectoryLog,
+    polyline_assets: &mut Assets<Polyline>,
+    // material: Handle<PolylineMaterial>,
+    material_assets: &mut Assets<PolylineMaterial>,
+) -> Option<(impl Bundle, Option<impl Bundle>, f64)> {
+    let points: Vec<Vec2> = traj.kinematic_data.positions().collect();
+
+    if !points.iter().all(|v| v.x.is_finite() && v.y.is_finite()) {
+        return None;
+    }
+
+    let h_p = polyline_assets.add(Polyline {
+        vertices: points.iter().map(|v| v.extend(0.0)).collect(),
+    });
+    
+    let h_mat = material_assets.add(PolylineMaterial {
+        width: 3.0,
+        color: traj.color(300.0),
+        perspective: true,
+        ..default()
+    });
+
+
+    let base_bundle = (
+        Name::new(format!("trajectory {}", traj.trajectory_number)),
+        traj.to_owned(),
+        PolylineBundle {
+            polyline: h_p,
+            material: h_mat,
+            transform: Transform::from_xyz(0.0, 0.0, 4.0 + (traj.unique_id as f32) * 1e-6),
+            ..default()
+        },
+    );
+
+
+    Some((base_bundle, None::<()>, traj.costs_cumulative_weighted))
+}
 pub(super) fn update_selected_trajectory(
     mut commands: Commands,
 
@@ -166,8 +206,8 @@ pub(super) fn update_selected_trajectory(
     ecommands.insert(SelectedTrajectory);
 
     if let Ok((selected, mut transform, mut stroke, mut visibility)) = trajectory_q.get_mut(*entity) {
-        *visibility = Visibility::Visible;
-        transform.translation.z += 10.0;
+        visibility.set_if_neq(Visibility::Visible);
+        // transform.translation.z += 10.0;
         *stroke = selected.selected_stroke(max_costs.max_costs);
     } else {
         bevy::log::warn!("could not find selected trajectory {:#?}", entity);
@@ -181,9 +221,8 @@ fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory
         .collect::<Option<Vec<Vec2>>>()
         .unwrap();
 
-    let traj_shape: shapes::Polygon = bevy_prototype_lyon::shapes::Polygon {
+    let traj_shape = crate::extra_shapes::Polyline {
         points: mpoints.clone(),
-        closed: false,
     };
 
     let mtraj = MainTrajectory {
@@ -208,7 +247,49 @@ fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory
     )
 }
 
-pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) {
+#[derive(Clone, Debug, miniserde::Deserialize, Resource)]
+pub(crate) struct VehicleParams {
+    pub(crate) cr_vehicle_id: i32,
+    pub(crate) length: f32,
+    pub(crate) width: f32,
+    pub(crate) wb_front_axle: f32,
+    pub(crate) wb_rear_axle: f32,
+    pub(crate) wheelbase: f32,
+    pub(crate) mass: f32,
+    pub(crate) a_max: f32,
+    pub(crate) v_max: f32,
+    pub(crate) v_switch: f32,
+    pub(crate) delta_min: f32,
+    pub(crate) delta_max: f32,
+    pub(crate) v_delta_min: f32,
+    pub(crate) v_delta_max: f32,
+}
+
+impl VehicleParams {
+    fn left(&self) -> Vec2 {
+        Vec2::new(0.0, self.width / 2.0)
+    }
+
+    fn right(&self) -> Vec2 {
+        Vec2::new(0.0, -self.width / 2.0)
+    }
+
+    fn front(&self) -> Vec2 {
+        Vec2::new(self.wb_front_axle, 0.0)
+    }
+
+    fn rear(&self) -> Vec2 {
+        Vec2::new(-self.wb_rear_axle, 0.0)
+    }
+}
+
+pub fn spawn_trajectories(
+    mut commands: Commands,
+    args: Res<crate::args::Args>,
+
+    mut polyline_assets: ResMut<Assets<Polyline>>,
+    mut material_assets: ResMut<Assets<PolylineMaterial>>,
+) {
     let main_trajectories_path = std::path::Path::join(&args.logs, "logs.csv");
     let main_trajectories = match log::read_main_log(&main_trajectories_path) {
         Ok(trajectories) => trajectories,
@@ -220,6 +301,47 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
     let (mtraj_res, mtraj_bundle) = make_main_trajectory_bundle(&main_trajectories);
 
     commands.spawn(mtraj_bundle);
+
+    let db_path = std::path::Path::join(&args.logs, "trajectories.db");
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+    ).unwrap();
+
+    let mut stmt = conn.prepare(
+        "SELECT json_extract(value, '$.vehicle') FROM meta WHERE key = 'config'"
+    ).unwrap();
+    let vparams: VehicleParams = stmt.query_row([], |row| {
+        let rusqlite::types::ValueRef::Text(st) = row.get_ref(0)? else { todo!() };
+        let rstr = std::str::from_utf8(st)?;
+        let data: VehicleParams = miniserde::json::from_str(rstr).map_err(|err| {
+            return rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(err));
+        })?;
+
+        Ok(data)
+    }).unwrap();
+
+    commands.insert_resource(vparams.clone());
+
+    let mut stmt = conn.prepare(
+        "SELECT time_step, id, x, y, theta, kappa, curvilinear_theta, v, a FROM trajectories"
+    ).unwrap();
+    let ittt = stmt.query_map([], |row| {
+        Ok(KinematicData {
+            x_positions_m: {
+                let rusqlite::types::ValueRef::Text(st) = row.get_ref(2)? else { todo!() };
+                let rstr = std::str::from_utf8(st)?;
+                let data: Vec<f32> = miniserde::json::from_str(rstr).unwrap();
+                data
+            },
+            y_positions_m: todo!(),
+            theta_orientations_rad: todo!(),
+            kappa_rad: todo!(),
+            curvilinear_orientations_rad: todo!(),
+            velocities_mps: todo!(),
+            accelerations_mps2: todo!(),
+        })
+    }).unwrap();
 
     let trajectories_path = std::path::Path::join(&args.logs, "trajectories.csv");
     let io_pool = bevy::tasks::TaskPoolBuilder::new()
@@ -274,13 +396,26 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
 
     let mut task_list: Vec<_> = vec![reader_task];
 
-    for _ in 0..6 {
+    // for _ in 0..6 {
+    //for _ in 0..1 
+    
+    let h_mat = material_assets.add(PolylineMaterial {
+        width: 3.0,
+        color: Color::hsl(145.0, 0.7, 0.5),
+        perspective: true,
+        ..default()
+    });
+    
+    let _res: Vec<Result<(), ()>> = io_pool.scope(|s| {
+        //let done = done.
         let done = done.clone();
         let buf = buf.clone();
         let headers = headers.clone();
         let sender = sender.clone();
 
-        let task: Task = io_pool
+        // let task: Task = io_pool
+        //let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send + Sync>>> = 
+        let task = s
             .spawn({
                 async move {
                     while !done.load(std::sync::atomic::Ordering::Relaxed) {
@@ -303,15 +438,26 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                         };
 
                         if let Some(bundle) = make_trajectory_bundle(&tl) {
-                            sender.send((tl.time_step, bundle))?;
+                            sender.send((tl.time_step, bundle)).unwrap();
                         }
+
+                        // if false {
+                        //     if let Some(bundle) =
+                        //         // make_trajectory_bundle(&tl)
+                        //         make_polyline_trajectory_bundle(&tl, &mut polyline_assets, &mut material_assets)
+                        //         {
+                        //         sender.send((tl.time_step, bundle)).unwrap();
+                        //     }
+                        // }
                     }
                     drop(sender);
                     Ok(())
                 }
             });
-        task_list.push(task);
-    }
+        // task_list.push(task);
+        //}
+        // task.detach();
+    });
 
     drop(sender);
 
@@ -344,16 +490,18 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
             .expect("error running deserialization task");
     }
 
+    // let ego_width = 1.941;
+    // let ego_length = 4.973;
+    
+    bevy::log::info!("using vparams: {:?}", vparams);
 
-    let ego_width = 1.941;
-    let ego_length = 4.973;
-
-    let rect = bevy_prototype_lyon::shapes::Rectangle {
-        extents: Vec2::new(ego_length, ego_width),
+    let rect = crate::extra_shapes::RoundedRectangle {
+        extents: Vec2::new(vparams.length, vparams.width),
         origin: RectangleOrigin::Center,
+        radius: 0.2,
     };
     let wheelbase_marker = bevy_prototype_lyon::shapes::Rectangle {
-        extents: Vec2::new(0.2, ego_width),
+        extents: Vec2::new(0.2, vparams.width),
         origin: RectangleOrigin::Center,
     };
 
@@ -366,11 +514,16 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
             continue;
         };
 
-        let rear_wheelbase = Vec3::new(-1.247, 0.0, 1.0);
-        let front_wheelbase = Vec3::new(1.724, 0.0, 1.0);
-        let wheel_marker = bevy_prototype_lyon::shapes::Rectangle {
+        let wheel_marker = crate::extra_shapes::RoundedRectangle {
             extents: Vec2::new(0.8, 0.25),
             origin: RectangleOrigin::Center,
+            radius: 0.1,
+        };
+        let wheel_fill = {
+            let mut fill = Fill::color(Color::DARK_GRAY);
+            fill.options.handle_intersections = false;
+            fill.options.tolerance = 1e-3;
+            fill
         };
         commands.spawn((
                 Name::new("ego obstacle"),
@@ -396,8 +549,20 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                     ..default()
                 },
                 // super::HoverTooltip::bundle("Ego Vehicle"),
-                Fill::color(Color::WHITE),
-                Stroke::new(Color::ORANGE_RED, 0.1),
+                {
+                    let mut fill = Fill::color(Color::WHITE);
+                    fill.options.handle_intersections = false;
+                    fill.options.tolerance = 1e-2;
+                    fill
+                },
+                {
+                    let mut stroke = Stroke::new(Color::ORANGE_RED, 0.1);
+                    stroke.options.tolerance = 1e-2;
+                    // stroke.options.line_join = LineJoin::Round;
+                    // stroke.options.start_cap = LineCap::Round;
+                    // stroke.options.end_cap = LineCap::Round;
+                    stroke
+                },
             ))
             .set_parent(*ts_group)
             .with_children(|builder| {
@@ -408,7 +573,7 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                             path: GeometryBuilder::build_as(&wheelbase_marker),
                             spatial: SpatialBundle {
                                 transform: {
-                                    Transform::from_translation(rear_wheelbase)
+                                    Transform::from_translation(vparams.rear().extend(1.0))
                                 },
                                 ..default()
                             },
@@ -423,13 +588,13 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                                 path: GeometryBuilder::build_as(&wheel_marker),
                                 spatial: SpatialBundle {
                                     transform: {
-                                        Transform::from_translation(Vec3::new(0.0, ego_width / 2.0, 0.5))
+                                        Transform::from_translation(vparams.left().extend(0.5))
                                     },
                                     ..default()
                                 },
                                 ..default()
                             },
-                            Fill::color(Color::DARK_GRAY),
+                            wheel_fill,
                         ));
                         builder.spawn((
                             Name::new("right rear wheel"),
@@ -437,13 +602,13 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                                 path: GeometryBuilder::build_as(&wheel_marker),
                                 spatial: SpatialBundle {
                                     transform: {
-                                        Transform::from_translation(Vec3::new(0.0, -ego_width / 2.0, 0.5))
+                                        Transform::from_translation(vparams.right().extend(0.5))
                                     },
                                     ..default()
                                 },
                                 ..default()
                             },
-                            Fill::color(Color::DARK_GRAY),
+                            wheel_fill,
                         ));
                     });
                 builder
@@ -453,7 +618,7 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                             path: GeometryBuilder::build_as(&wheelbase_marker),
                             spatial: SpatialBundle {
                                 transform: {
-                                    Transform::from_translation(front_wheelbase)
+                                    Transform::from_translation(vparams.front().extend(1.0))
                                 },
                                 ..default()
                             },
@@ -462,12 +627,9 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                         Fill::color(Color::GRAY),
                         super::HoverTooltip::bundle("Front Wheelbase"),
                     )).with_children(|builder| {
-                        let wheel_marker = bevy_prototype_lyon::shapes::Rectangle {
-                            extents: Vec2::new(0.8, 0.25),
-                            origin: RectangleOrigin::Center,
-                        };
-
                         let curvature = *mtraj_res.kinematic_data.kappa_rad.get(ts_idx).unwrap();
+
+                        let steering_angle = (vparams.wheelbase * curvature).atan();
 
                         builder.spawn((
                             Name::new("left front wheel"),
@@ -475,15 +637,15 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                                 path: GeometryBuilder::build_as(&wheel_marker),
                                 spatial: SpatialBundle {
                                     transform: {
-                                        let mut transform = Transform::from_translation(Vec3::new(0.0, ego_width / 2.0, 0.5));
-                                        transform.rotate_z(curvature);
+                                        let mut transform = Transform::from_translation(vparams.left().extend(0.5));
+                                        transform.rotate_z(steering_angle);
                                         transform
                                     },
                                     ..default()
                                 },
                                 ..default()
                             },
-                            Fill::color(Color::DARK_GRAY),
+                            wheel_fill,
                         ));
                         builder.spawn((
                             Name::new("right front wheel"),
@@ -491,15 +653,15 @@ pub fn spawn_trajectories(mut commands: Commands, args: Res<crate::args::Args>) 
                                 path: GeometryBuilder::build_as(&wheel_marker),
                                 spatial: SpatialBundle {
                                     transform: {
-                                        let mut transform = Transform::from_translation(Vec3::new(0.0, -ego_width / 2.0, 0.5));
-                                        transform.rotate_z(curvature);
+                                        let mut transform = Transform::from_translation(vparams.right().extend(0.5));
+                                        transform.rotate_z(steering_angle);
                                         transform
                                     },
                                     ..default()
                                 },
                                 ..default()
                             },
-                            Fill::color(Color::DARK_GRAY),
+                            wheel_fill,
                         ));
                     });
             });
@@ -520,14 +682,14 @@ pub(crate) fn trajectory_group_visibility(
         return;
     }
     let time_step = time_step.time_step;
-    bevy::log::debug!("updating group visibility");
+    bevy::log::info!("updating group visibility");
 
     for (entity, traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.time_step == time_step {
-            *visibility = Visibility::Visible;
+            visibility.set_if_neq(Visibility::Visible);
             commands.entity(entity).insert(CurrentTrajectoryGroup);
         } else {
-            *visibility = Visibility::Hidden;
+            visibility.set_if_neq(Visibility::Hidden);
             commands.entity(entity).remove::<CurrentTrajectoryGroup>();
         }
     }
@@ -542,13 +704,13 @@ pub(crate) fn trajectory_visibility(
         return;
     }
 
-    bevy::log::debug!("updating traj visibility");
+    bevy::log::info!("updating traj visibility");
 
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.feasible || settings.show_infeasible {
-            *visibility = Visibility::Inherited;
+            visibility.set_if_neq(Visibility::Inherited);
         } else {
-            *visibility = Visibility::Hidden;
+            visibility.set_if_neq(Visibility::Hidden);
         }
     }
 }
@@ -621,6 +783,7 @@ fn trajectory_description(
     plot_data: plot::TrajectoryPlotData,
     time_step: f32,
     issues_detected: bool,
+    vparams: &VehicleParams,
 ) -> (bool, Option<f64>) {
     let mut xcursor = None;
 
@@ -757,10 +920,8 @@ fn trajectory_description(
                             });
                             row.col(|ui| {
                                 ui.with_layout(value_cell_layout, |ui| {
-                                    rich_label!(ui, traj.actual_traj_length, "{} m");
-                                });
+                                    rich_label!(ui, traj.actual_traj_length, "{} time steps");
                             });
-                        });
                      */ 
                 });
         });
@@ -883,17 +1044,17 @@ fn trajectory_description(
                                         });
                                         row.col(|ui| {
                                             ui.with_layout(value_cell_layout, |ui| {
+                                                let inf_val: f64 = traj.$inf_name;
                                                 let text = egui::RichText::new(format!(
                                                     "{:>5.0}",
-                                                    traj.$inf_name
-                                                ))
-                                                .monospace();
-                                                let resp = ui.label(if traj.$inf_name == 0.0 {
+                                                    inf_val
+                                                )).monospace();
+                                                let resp = ui.label(if inf_val == 0.0 {
                                                     text.weak()
                                                 } else {
                                                     text
                                                 });
-                                                resp.on_hover_text(traj.$inf_name.to_string());
+                                                resp.on_hover_text(inf_val.to_string());
                                             });
                                         });
                                     });
@@ -906,9 +1067,11 @@ fn trajectory_description(
                         });
                 });
 
+                // ui.label(format!("curvature values (len={}): {:?}", traj.kinematic_data.kappa_rad.len(), traj.kinematic_data.kappa_rad));
+
                 ui.separator();
 
-                xcursor = plot::plot_traj(plot_data, ui, time_step)
+                xcursor = plot::plot_traj(plot_data, ui, time_step, vparams)
             });
         });
 
@@ -935,6 +1098,8 @@ pub(crate) fn trajectory_window(
     mtraj: Res<MainTrajectory>,
 
     mut cached_plot_data: Local<Option<std::sync::Arc<plot::CachedTrajectoryPlotData>>>,
+
+    vparams: Res<VehicleParams>,
 ) {
     let ctx = contexts.ctx_mut();
 
@@ -975,6 +1140,7 @@ pub(crate) fn trajectory_window(
                         plot_data,
                         cts.dynamic_time_step.round(),
                         invalid_data,
+                        &vparams,
                     );
                     if new_issues_detected && invalid_data != new_issues_detected {
                         commands.entity(entity).insert(HasInvalidData);
@@ -1189,12 +1355,24 @@ pub(crate) fn trajectory_list(
 
     mut sort_key: ResMut<TrajectorySortKey>,
     mut sort_dir: ResMut<SortDirection>,
+
+    mut show_infeasible: Local<bool>,
 ) {
     let ctx = contexts.ctx_mut();
 
     let Ok(children) = group_q.get_single() else {
         return;
     };
+
+
+    let feasible = children
+        .iter()
+        .map(|x| *x)
+        .filter(|entity| {
+            let Ok((traj, _selected, _invalid_data)) = trajectory_q.get(*entity) else { return false; };
+            return traj.feasible;
+        })
+        .collect::<Vec<_>>();
 
     let selected_idx = selected_q
         .get_single()
@@ -1205,10 +1383,59 @@ pub(crate) fn trajectory_list(
         .with_main_align(egui::Align::Max)
         .with_main_justify(true);
 
+    let add_row = |entity: Entity, mut row: egui_extras::TableRow| -> bool {
+        let mut should_select = false;
+
+        let Ok((traj, selected, invalid_data)) = trajectory_q.get(entity) else { return should_select; };
+        row.col(|ui| {
+            ui.horizontal(|ui| {
+                let clicked = ui.selectable_label(selected, traj.unique_id.to_string()).clicked();
+                if !selected && clicked {
+                    should_select = true;
+                }
+
+                if invalid_data {
+                    let resp = ui.label(egui::RichText::new("\u{26A0}").color(egui::Color32::YELLOW));
+                    resp.on_hover_text("Some values (e.g. computed costs) for this trajectory are invalid because they are NaN or infinity");
+                }
+
+                if !traj.feasible {
+                    ui.label(egui::RichText::new("(infeasible)").italics().weak());
+                } else {
+                    ui.label(egui::RichText::new("\u{2714}").italics().weak());
+
+                }
+            });
+        });
+        row.col(|ui| {
+            let max_deviation: f32 = traj.max_deviation().into();
+
+            ui.with_layout(value_cell_layout, |ui| {
+                rich_label!(ui, max_deviation, "{:>10.4} rad");
+            });
+        });
+        row.col(|ui| {
+            let final_velocity: f32 = traj.final_velocity().into();
+
+            ui.with_layout(value_cell_layout, |ui| {
+                rich_label!(ui, final_velocity, "{:>10.2} m/s");
+            });
+        });
+        row.col(|ui| {
+            ui.with_layout(value_cell_layout, |ui| {
+                rich_label!(ui, traj.costs_cumulative_weighted, "{:>8.3}");
+            });
+        });
+
+        return should_select;
+    };
+
     use egui_extras::{Column, TableBuilder};
     egui::Window::new(format!("Trajectory List for Time Step {}", ts.time_step))
         .id(egui::Id::new("trajectory list window"))
         .show(ctx, |ui| {
+        ui.checkbox(&mut show_infeasible, "Show infeasible");
+
         let mut tb = TableBuilder::new(ui)
             .striped(true)
             .column(Column::initial(120.0).resizable(true))
@@ -1216,6 +1443,7 @@ pub(crate) fn trajectory_list(
             .column(Column::initial(100.0).resizable(true).clip(true))
             .column(Column::exact(100.0).clip(true))
             ;
+
 
         if sort_key.is_changed() || sort_dir.is_changed() {
             tb = tb.scroll_to_row(0, None);
@@ -1228,7 +1456,6 @@ pub(crate) fn trajectory_list(
                 macro_rules! header_entry {
                     ($key:expr, $label:expr) => {
                         header.col(|ui| {
-                            // use core::ops::DerefMut;
                             let selected = *sort_key == $key;
                             let label_text = if selected { format!("{} {}", $label, sort_dir.symbol()) } else { $label.to_string() };
                             let text = egui::RichText::new(label_text).heading().size(14.0);
@@ -1250,50 +1477,24 @@ pub(crate) fn trajectory_list(
                 header_entry!(TrajectorySortKey::Cost, "Cost");
             })
             .body(|body| {
-                body.rows(18.0, children.len() - 1, |row_index, mut row| {
-                    let entity = *children.get(row_index).unwrap();
-                    let Ok((traj, selected, invalid_data)) = trajectory_q.get(entity) else { return; };
-                    row.col(|ui| {
-                        ui.horizontal(|ui| {
-                            let clicked = ui.selectable_label(selected, traj.unique_id.to_string()).clicked();
-                            if !selected && clicked {
-                                send_selection_event.send(SelectTrajectoryEvent(entity));
-                                sort_dir.set_changed();
-                                sort_key.set_changed();
-                            }
+                let count = if *show_infeasible {
+                    children.len() - 1
+                } else {
+                    feasible.len()
+                };
 
-                            if invalid_data {
-                                let resp = ui.label(egui::RichText::new("\u{26A0}").color(egui::Color32::YELLOW));
-                                resp.on_hover_text("Some values (e.g. computed costs) for this trajectory are invalid because they are NaN or infinity");
-                            }
-
-                            if !traj.feasible {
-                                ui.label(egui::RichText::new("(infeasible)").italics().weak());
-                            } else {
-                                ui.label(egui::RichText::new("\u{2714}").italics().weak());
-
-                            }
-                        });
-                    });
-                    row.col(|ui| {
-                        let max_deviation: f32 = traj.max_deviation().into();
-
-                        ui.with_layout(value_cell_layout, |ui| {
-                            rich_label!(ui, max_deviation, "{:>10.4} rad");
-                        });
-                    });
-                    row.col(|ui| {
-                        let final_velocity: f32 = traj.final_velocity().into();
-
-                        ui.with_layout(value_cell_layout, |ui| {
-                            rich_label!(ui, final_velocity, "{:>10.2} m/s");
-                        });
-                    });
-                    row.col(|ui| {
-                        ui.with_layout(value_cell_layout, |ui| {
-                            rich_label!(ui, traj.costs_cumulative_weighted, "{:>8.3}");
-                        });
-                    });
+                body.rows(18.0, count, |row_index, row| {
+                    let entity = if *show_infeasible {
+                        *children.get(row_index).unwrap()
+                    } else {
+                        *feasible.get(row_index).unwrap()
+                    };
+                    let should_select = add_row(entity, row);
+                    if should_select {
+                        send_selection_event.send(SelectTrajectoryEvent(entity));
+                        sort_dir.set_changed();
+                        sort_key.set_changed();
+                    }
                 });
             });
     });

@@ -1,15 +1,15 @@
+use std::time::Duration;
+
+use bevy::{prelude::*, core::TaskPoolThreadAssignmentPolicy};
+
 use backends::raycast::bevy_mod_raycast::deferred::RaycastSource;
-use bevy::prelude::*;
 
 #[cfg(feature = "editor")]
 use bevy_editor_pls::prelude::*;
 
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
-
 use commonroad_pb::CommonRoad;
 
 use prost::Message;
-use std::io::Read;
 
 use bevy_mod_picking::prelude::*;
 
@@ -27,6 +27,8 @@ mod finite;
 
 mod ui;
 
+mod extra_shapes;
+
 impl Resource for CommonRoad {}
 
 // fn main() -> color_eyre::eyre::Result<()> {
@@ -34,18 +36,20 @@ impl Resource for CommonRoad {}
 
 
 fn main() -> Result<(), std::io::Error> {
-    use clap::Parser;
+    // use clap::Parser;
     let args = crate::args::Args::parse();
 
-    // TODO: Improve file loading error reporting
-    let f = std::fs::File::open(&args.scenario)?;
-    let cr = read_cr(f);
+    let cr = read_cr(&args);
 
     let mut app = App::new();
 
     app.insert_resource(cr)
         .insert_resource(args)
-        .insert_resource(bevy::winit::WinitSettings::desktop_app())
+        .insert_resource(bevy::winit::WinitSettings {
+            focused_mode: bevy::winit::UpdateMode::ReactiveLowPower { wait: Duration::from_secs(5) },
+            unfocused_mode: bevy::winit::UpdateMode::ReactiveLowPower { wait: Duration::from_secs(90) },
+            return_from_run: false,
+        })
         .add_plugins(CustomDefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Corroscope".into(),
@@ -63,15 +67,17 @@ fn main() -> Result<(), std::io::Error> {
 
     #[cfg(feature = "dev")]
     app
-        .add_plugins(LogDiagnosticsPlugin::default())
-        .add_plugins(FrameTimeDiagnosticsPlugin);
+        .add_plugins(bevy::diagnostic::LogDiagnosticsPlugin::default())
+        .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin);
+
+    #[cfg(feature = "framepace")]
+    app.add_plugins(bevy_framepace::FramepacePlugin);
 
     // Rendering
     app.insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
-        .insert_resource(Msaa::Sample4)
-        .add_plugins(bevy_framepace::FramepacePlugin)
         .add_plugins(bevy_egui::EguiPlugin)
         .add_plugins(bevy_prototype_lyon::prelude::ShapePlugin)
+        .add_plugins(bevy_polyline::PolylinePlugin)
         .add_plugins(bevy_pancam::PanCamPlugin);
 
     // Picking
@@ -85,7 +91,8 @@ fn main() -> Result<(), std::io::Error> {
     app.add_plugins(global_settings::GlobalSettingsPlugin)
         .add_plugins(elements::ElementsPlugin)
         .add_plugins(ui::SelectiveInputPlugin)
-        .add_systems(Startup, camera_setup);
+        .add_systems(Startup, camera_setup)
+        .add_systems(Update, update_camera_3d.after(bevy_pancam::PanCamSystemSet));
 
     #[cfg(feature = "debug_picking")]
     {
@@ -154,27 +161,116 @@ fn export_dot(app: &mut App) -> Result<(), std::io::Error> {
 }
 
 #[derive(Component)]
-#[component(storage = "SparseSet")]
+// #[component(storage = "SparseSet")]
 pub(crate) struct MainCamera;
 
+#[derive(Component)]
+// #[component(storage = "SparseSet")]
+pub(crate) struct MainCamera3d;
 fn camera_setup(mut commands: Commands) {
-    commands
-        .spawn((
-            MainCamera,
-            // RaycastPickCamera::default(),
-            RaycastSource::<()>::new_cursor(),
-            Camera2dBundle {
-                projection: OrthographicProjection {
-                    scale: 0.1, // 0.001,
-                    ..default()
-                },
-                ..Camera2dBundle::new_with_far(250.0)
+    let ortho = OrthographicProjection {
+        scale: 0.1, // 0.001,
+        ..default()
+    };
+
+    commands.spawn((
+        MainCamera,
+        RaycastSource::<()>::new_cursor(),
+        Camera2dBundle {
+            projection: ortho.clone(),
+            ..Camera2dBundle::new_with_far(250.0)
+        },
+        bevy_pancam::PanCam::default(),
+    ));
+
+    commands.spawn((
+        MainCamera3d,
+        Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 0.0, ortho.far - 0.1).looking_at(Vec3::ZERO, Vec3::Y),
+            projection: Projection::Orthographic(ortho.clone()),
+            camera: Camera {
+                order: 1,
+                hdr: false,
+                ..default()
             },
-        ))
-        .insert(bevy_pancam::PanCam::default());
+            camera_3d: Camera3d {
+                clear_color: bevy::core_pipeline::clear_color::ClearColorConfig::None,
+                ..default()
+            },
+            ..default()
+        },
+    ));
 }
 
-fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
+fn update_camera_3d(
+    mut camera_main_q: Query<(Ref<Transform>, Ref<OrthographicProjection>), (With<MainCamera>, Without<MainCamera3d>, Or<(Changed<OrthographicProjection>, Changed<Transform>)>)>,
+
+    mut camera_3d_q: Query<(&mut Transform, &mut Projection), (With<MainCamera3d>, Without<MainCamera>)>,
+) {
+    let Ok((transform, ortho)) = camera_main_q.get_single_mut() else {
+        return;
+    };
+
+    let (mut transform_3d, mut proj_3d) = camera_3d_q.single_mut();
+    if transform.is_changed() {
+        transform_3d.set_if_neq(*transform);
+    }
+    if ortho.is_changed() {
+        match proj_3d.as_ref() {
+            Projection::Orthographic(ortho_3d) => {
+                if ortho_3d.scale != ortho.scale {
+                    *proj_3d = Projection::Orthographic(ortho.clone());
+                }
+            },
+            _ => {
+                panic!("unexpected projection in MainCamera3d");
+            },
+        };
+   }
+}
+
+#[derive(Debug)]
+struct MetaQueryError;
+
+impl std::error::Error for MetaQueryError {}
+
+impl std::fmt::Display for MetaQueryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "meta query error")
+    }
+}
+
+fn read_cr(args: &crate::args::Args) -> commonroad_pb::CommonRoad {
+    let db_path = std::path::Path::join(&args.logs, "trajectories.db");
+    let conn = rusqlite::Connection::open_with_flags(
+        db_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+    ).unwrap();
+
+    let data: commonroad_pb::CommonRoad = {
+        let mut stmt = conn.prepare(
+            "SELECT value FROM meta WHERE key = 'scenario'"
+        ).unwrap();
+
+        stmt.query_row([], |row| {
+            let rusqlite::types::ValueRef::Blob(st) = row.get_ref(0)? else {
+                return Err(rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Blob, Box::new(MetaQueryError)));
+             };
+
+            commonroad_pb::CommonRoad::decode(st).map_err(|err| {
+                return rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Blob, Box::new(err));
+            })
+        }).unwrap()
+    };
+
+    conn.close().unwrap();
+
+    return data;
+
+    /*
+    mut file: std::fs::File,
+    // TODO: Improve file loading error reporting
+    let f = std::fs::File::open(&args.scenario)?;
     let mut buffer = Vec::new();
 
     // read the whole file
@@ -183,6 +279,7 @@ fn read_cr(mut file: std::fs::File) -> commonroad_pb::CommonRoad {
     let buf = bytes::Bytes::from(buffer);
 
     commonroad_pb::CommonRoad::decode(buf).unwrap()
+    */
 }
 
 pub struct CustomDefaultPlugins;
@@ -192,7 +289,18 @@ impl PluginGroup for CustomDefaultPlugins {
         let mut group = bevy::app::PluginGroupBuilder::start::<Self>();
         group = group
             .add(bevy::log::LogPlugin::default())
-            .add(bevy::core::TaskPoolPlugin::default())
+            .add(bevy::core::TaskPoolPlugin {
+                task_pool_options: TaskPoolOptions {
+                    min_total_threads: 8,
+                    max_total_threads: 8,
+                    compute: TaskPoolThreadAssignmentPolicy {
+                        min_threads: 7,
+                        max_threads: 8,
+                        percent: 1.0
+                    },
+                    ..default()
+                }
+            })
             .add(bevy::core::TypeRegistrationPlugin::default())
             .add(bevy::core::FrameCountPlugin::default())
             .add(bevy::time::TimePlugin::default())
@@ -201,7 +309,8 @@ impl PluginGroup for CustomDefaultPlugins {
             .add(bevy::diagnostic::DiagnosticsPlugin::default())
             .add(bevy::input::InputPlugin::default())
             .add(bevy::window::WindowPlugin::default())
-            .add(bevy::a11y::AccessibilityPlugin);
+            .add(bevy::a11y::AccessibilityPlugin)
+            ;
 
         {
             group = group.add(bevy::asset::AssetPlugin::default());
@@ -218,8 +327,7 @@ impl PluginGroup for CustomDefaultPlugins {
                 // compressed texture formats
                 .add(bevy::render::texture::ImagePlugin::default());
 
-            // #[cfg(all(not(target_arch = "wasm32"), feature = "multi-threaded"))]
-            // #[cfg(feature = "multi-threaded")]
+            #[cfg(all(not(target_arch = "wasm32")))]
             {
                 group = group
                     .add(bevy::render::pipelined_rendering::PipelinedRenderingPlugin::default());
