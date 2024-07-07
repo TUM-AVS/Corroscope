@@ -59,7 +59,10 @@ fn main() -> Result<(), std::io::Error> {
             }),
             exit_condition: bevy::window::ExitCondition::OnPrimaryClosed,
             close_when_requested: true,
-        }))
+        }));
+
+    #[cfg(feature = "dev")]
+    app
         .add_plugins(LogDiagnosticsPlugin::default())
         .add_plugins(FrameTimeDiagnosticsPlugin);
 
@@ -109,11 +112,15 @@ fn main() -> Result<(), std::io::Error> {
     #[cfg(feature = "editor")]
     {
         const ENABLE_EDITOR: bool = false;
+        const EDITOR_SECOND_MONITOR: bool = false;
 
         if ENABLE_EDITOR {
-            app.add_plugins(EditorPlugin::on_second_monitor_fullscreen(
-                EditorPlugin::default(),
-            ));
+            let editor = EditorPlugin::default();
+            if EDITOR_SECOND_MONITOR {
+                app.add_plugins(EditorPlugin::on_second_monitor_fullscreen(editor));
+            } else {
+                app.add_plugins(editor);
+            }
         }
     }
 
@@ -161,7 +168,7 @@ fn camera_setup(mut commands: Commands) {
                     scale: 0.1, // 0.001,
                     ..default()
                 },
-                ..default()
+                ..Camera2dBundle::new_with_far(250.0)
             },
         ))
         .insert(bevy_pancam::PanCam::default());
@@ -211,7 +218,8 @@ impl PluginGroup for CustomDefaultPlugins {
                 // compressed texture formats
                 .add(bevy::render::texture::ImagePlugin::default());
 
-            #[cfg(all(not(target_arch = "wasm32"), feature = "multi-threaded"))]
+            // #[cfg(all(not(target_arch = "wasm32"), feature = "multi-threaded"))]
+            // #[cfg(feature = "multi-threaded")]
             {
                 group = group
                     .add(bevy::render::pipelined_rendering::PipelinedRenderingPlugin::default());
