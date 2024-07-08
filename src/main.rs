@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bevy::{prelude::*, core::TaskPoolThreadAssignmentPolicy};
 
 use backends::raycast::bevy_mod_raycast::deferred::RaycastSource;
@@ -108,10 +106,13 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     #[cfg(feature = "inspector")]
     {
-        use bevy_inspector_egui::quick::WorldInspectorPlugin;
         app.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin);
 
-        // app.add_plugins(WorldInspectorPlugin::new());
+        const ENABLE_WORLD_INSPECTOR: bool = false;
+        if ENABLE_WORLD_INSPECTOR {
+            use bevy_inspector_egui::quick::WorldInspectorPlugin;
+            app.add_plugins(WorldInspectorPlugin::new());
+        }
     }
 
     #[cfg(feature = "editor")]

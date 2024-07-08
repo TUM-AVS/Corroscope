@@ -1,10 +1,8 @@
 use bevy::prelude::*;
 
 use bevy_prototype_lyon::prelude::*;
+use bevy_prototype_lyon::shapes::RectangleOrigin;
 
-use  bevy_prototype_lyon::shapes::RectangleOrigin;
-
-use lyon_path::geom::LineSegment;
 use lyon_path::math::{Point, Box2D};
 use lyon_path::geom::euclid::Size2D;
 

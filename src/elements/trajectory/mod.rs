@@ -208,7 +208,7 @@ pub(super) fn update_selected_trajectory(
     let mut ecommands = commands.entity(*entity);
     ecommands.insert(SelectedTrajectory);
 
-    if let Ok((selected, mut transform, mut stroke, mut visibility)) = trajectory_q.get_mut(*entity) {
+    if let Ok((selected, _transform, mut stroke, mut visibility)) = trajectory_q.get_mut(*entity) {
         visibility.set_if_neq(Visibility::Visible);
         // transform.translation.z += 10.0;
         *stroke = selected.selected_stroke(max_costs.max_costs);
@@ -250,6 +250,7 @@ fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory
     )
 }
 
+#[allow(unused)]
 #[derive(Clone, Debug, miniserde::Deserialize, Resource)]
 pub(crate) struct VehicleParams {
     pub(crate) cr_vehicle_id: i32,
@@ -290,7 +291,7 @@ pub fn spawn_trajectories(
     mut commands: Commands,
     args: Res<crate::args::Args>,
 
-    mut polyline_assets: ResMut<Assets<Polyline>>,
+    _polyline_assets: ResMut<Assets<Polyline>>,
     mut material_assets: ResMut<Assets<PolylineMaterial>>,
 ) {
     let main_trajectories_path = std::path::Path::join(&args.logs, "logs.csv");
@@ -418,7 +419,7 @@ pub fn spawn_trajectories(
 
         // let task: Task = io_pool
         //let task: bevy::tasks::Task<Result<(), Box<dyn std::error::Error + Send + Sync>>> = 
-        let task = s
+        s
             .spawn({
                 async move {
                     while !done.load(std::sync::atomic::Ordering::Relaxed) {
@@ -537,12 +538,12 @@ pub fn spawn_trajectories(
                             let theta = *mtraj_res.kinematic_data.theta_orientations_rad.get(ts_idx).unwrap();
                             let rotation = Quat::from_rotation_z(theta);
 
-                            let orientation_transform0 = Transform::from_rotation(rotation);
+                            let _orientation_transform0 = Transform::from_rotation(rotation);
                             let mut orientation_transform = Transform::default();
                             // orientation_transform.translation += rear_wheelbase;
                             orientation_transform.rotate(rotation);
                             // orientation_transform.translation -= rear_wheelbase;
-                            let mut pos_transform  = Transform::from_translation(pos.extend(20.0));
+                            let pos_transform  = Transform::from_translation(pos.extend(20.0));
                             let transform = pos_transform
                                 .mul_transform(orientation_transform);
                             transform
