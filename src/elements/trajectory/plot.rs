@@ -183,9 +183,9 @@ pub(crate) fn plot_traj(
 
             pui.vline(ts_vline.clone());
 
-            pui.hline(
-                egui_plot::HLine::new(vparams.v_max).style(egui_plot::LineStyle::Dashed { length: 10.0 }),
-            ); // .name("v_max"));
+            // pui.hline(
+            //     egui_plot::HLine::new(vparams.v_max).style(egui_plot::LineStyle::Dashed { length: 10.0 }),
+            // ); // .name("v_max"));
 
             if let Some(pointer) = pui.pointer_coordinate() {
                 cursor_x = Some(pointer.x);
