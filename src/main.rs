@@ -43,11 +43,11 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     app.insert_resource(cr)
         .insert_resource(args)
-        .insert_resource(bevy::winit::WinitSettings {
-            focused_mode: bevy::winit::UpdateMode::ReactiveLowPower { wait: Duration::from_secs(5) },
-            unfocused_mode: bevy::winit::UpdateMode::ReactiveLowPower { wait: Duration::from_secs(90) },
-            return_from_run: false,
-        })
+        // .insert_resource(bevy::winit::WinitSettings {
+        //     focused_mode: bevy::winit::UpdateMode::ReactiveLowPower { wait: Duration::from_secs(5) },
+        //     unfocused_mode: bevy::winit::UpdateMode::ReactiveLowPower { wait: Duration::from_secs(90) },
+        //     return_from_run: false,
+        // })
         .add_plugins(CustomDefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Corroscope".into(),
