@@ -14,7 +14,7 @@ impl Plugin for ElementsPlugin {
             .init_resource::<trajectory::SortDirection>()
             .add_systems(Startup,
                 (
-                    obstacle::spawn_obstacles,
+                    obstacle::spawn_obstacles.after(crate::camera_setup),
                     lanelet::spawn_lanelets,
                     trajectory::spawn_trajectories,
                     ref_path::spawn_ref_path,

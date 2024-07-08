@@ -6,7 +6,7 @@ use bevy_egui::EguiContexts;
 
 use bevy_prototype_lyon::prelude::*;
 
-use crate::commonroad_pb;
+use crate::commonroad_pb::{self, DynamicObstacle};
 
 use crate::commonroad_pb::{integer_exact_or_interval, CommonRoad};
 use egui_plot::PlotPoints;
@@ -317,7 +317,27 @@ pub fn plot_obs(mut contexts: EguiContexts, cr: Res<CommonRoad>) {
     });
 }
 
-pub fn spawn_obstacles(mut commands: Commands, cr: Res<crate::CommonRoad>) {
+fn initial_position(obs: &DynamicObstacle) -> Option<Vec2> {
+    let Some(commonroad_pb::dynamic_obstacle::Prediction::TrajectoryPrediction(traj)) =
+        &obs.prediction
+    else {
+        return None;
+    };
+    let state = traj.trajectory.states.first()?;
+
+    match state.position.as_ref()? {
+        commonroad_pb::state::Position::Point(p) => {
+            Some(Vec2::from(p.clone()))
+        },
+        _ => { return None; },
+    }
+}
+
+pub fn spawn_obstacles(
+    mut commands: Commands,
+    cr: Res<crate::CommonRoad>,
+    mut camera_q: Query<&mut Transform, With<crate::MainCamera>>,
+) {
     let mut max_ts = i32::MIN;
 
     for obs in &cr.dynamic_obstacles {
@@ -330,4 +350,16 @@ pub fn spawn_obstacles(mut commands: Commands, cr: Res<crate::CommonRoad>) {
         dynamic_time_step: 0.0,
         prediction_range: 0.0..=((max_ts - 1) as f32),
     });
+
+    if let Some(obs) = cr.dynamic_obstacles.first() {
+        let mut transform = camera_q
+            .get_single_mut()
+            .expect("failed to query main camera");
+
+        let Some(pos) = initial_position(obs) else { return; };
+
+        transform.translation.x = pos.x;
+        transform.translation.y = pos.y;
+    }
+
 }
