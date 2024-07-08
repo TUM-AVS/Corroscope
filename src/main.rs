@@ -31,11 +31,9 @@ mod extra_shapes;
 
 impl Resource for CommonRoad {}
 
-// fn main() -> color_eyre::eyre::Result<()> {
-//     color_eyre::install()?;
+fn main() -> color_eyre::eyre::Result<()> {
+    color_eyre::install()?;
 
-
-fn main() -> Result<(), std::io::Error> {
     // use clap::Parser;
     let args = crate::args::Args::parse();
 
