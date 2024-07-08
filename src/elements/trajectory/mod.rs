@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use bevy::prelude::*;
 
@@ -287,12 +287,151 @@ impl VehicleParams {
     }
 }
 
+fn read_vehicle_params(
+    conn: &rusqlite::Connection,
+) -> rusqlite::Result<VehicleParams> {
+    let mut stmt = conn.prepare(
+        "SELECT json_extract(value, '$.vehicle') FROM meta WHERE key = 'config_sim'"
+    ).unwrap();
+    let vparams: VehicleParams = stmt.query_row([], |row| {
+        let rusqlite::types::ValueRef::Text(st) = row.get_ref(0)? else { todo!() };
+        let rstr = std::str::from_utf8(st)?;
+        let data: VehicleParams = miniserde::json::from_str(rstr).map_err(|err| {
+            return rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(err));
+        })?;
+
+        Ok(data)
+    }).unwrap();
+
+    Ok(vparams)
+}
+
+fn read_trajectories(
+    conn: &rusqlite::Connection,
+) -> rusqlite::Result<Vec<TrajectoryLog>> {
+    let filter_column_names = |stmt: rusqlite::Statement| {
+        stmt
+            .column_names()
+            .into_iter()
+            .filter(|name| *name != "id" && *name != "time_step")
+            .map(ToString::to_string)
+            .collect()
+    };
+
+    let stmt = conn.prepare(
+        "SELECT * FROM infeasability"
+    )?;
+    let inf_names: Vec<_> = filter_column_names(stmt);
+
+    let stmt = conn.prepare(
+        "SELECT * FROM costs"
+    )?;
+    let cost_names = filter_column_names(stmt);
+
+
+    bevy::log::info!("column names done");
+
+    // let cost_names = stmt
+    //     .column_names()
+    //     .iter()
+    //     .filter(|&name| *name != "id" && *name != "time_step")
+    //     .collect();
+    
+    // conn.execute_batch(
+    //     "ANALYZE trajectories;
+    //     ANALYZE trajectories_meta;
+    //     ANALYZE costs;
+    //     ANALYZE infeasability;
+    //     "
+    // )?;
+
+    let mut stmt = conn.prepare(
+        "SELECT count(*) FROM trajectories"
+    )?;
+    let count: i64 = stmt.query_row([], |row| {
+        row.get(0)
+    })?;
+
+    let mut stmt = conn.prepare(
+        "SELECT *
+        FROM trajectories 
+            INNER JOIN trajectories_meta USING (time_step, id)
+            INNER JOIN costs USING (time_step, id)
+            INNER JOIN infeasability USING (time_step, id)"
+    )?;
+    let names = stmt.column_names();
+    bevy::log::info!("names={:#?}", names);
+
+
+    bevy::log::info!("COUNT={}", count);
+    
+    let mut idx = 1;
+
+    let ittt = stmt.query_map([], |row| {
+        bevy::log::info!("{}/{}", idx, count);
+        idx += 1;
+
+        let convert = |idx| -> rusqlite::Result<Vec<f32>> {
+            let rusqlite::types::ValueRef::Text(st) = row.get_ref(idx)? else { todo!() };
+            let rstr = std::str::from_utf8(st).map_err(rusqlite::Error::Utf8Error)?;
+            let data: Vec<f32> = miniserde::json::from_str(rstr).unwrap();
+            Ok(data)
+        };
+        let kd = KinematicData {
+            x_positions_m: convert("x")?,
+            y_positions_m: convert("y")?,
+            theta_orientations_rad: convert("theta")?,
+            kappa_rad: convert("kappa")?,
+            curvilinear_orientations_rad: convert("curvilinear_theta")?,
+            velocities_mps: convert("v")?,
+            accelerations_mps2: convert("a")?,
+        };
+
+        let fetch_map = |names: &Vec<String>| -> rusqlite::Result<_> {
+            Ok(names
+                .iter()
+                .map(|name| Ok((name.clone(), row.get(name.as_str())?)) )
+                .collect::<rusqlite::Result<HashMap<_, _>>>()?)
+        };
+
+        let costs: HashMap<String, f64> = fetch_map(&cost_names)?;
+        let infeasability: HashMap<String, f64> = fetch_map(&inf_names)?;
+
+        let tl = TrajectoryLog {
+            time_step: row.get("time_step")?,
+            // TODO: remove?
+            trajectory_number: -1,
+            unique_id: row.get("id")?,
+            feasible: row.get("feasible")?,
+            // TODO: add
+            horizon: -1.0,
+            dt: row.get("dt")?,
+            kinematic_data: kd,
+            s_position_m: row.get("s_position")?,
+            d_position_m: row.get("d_position")?,
+            ego_risk: row.get("ego_risk")?,
+            obst_risk: row.get("obst_risk")?,
+            costs_cumulative_weighted: row.get("costs_cumulative_weighted")?,
+            costs,
+            inf_kin_yaw_rate: *infeasability.get("Yaw_rate").unwrap(),
+            inf_kin_acceleration: *infeasability.get("Acceleration").unwrap(),
+            inf_kin_max_curvature: *infeasability.get("Curvature").unwrap(),
+            // todo
+            inf_kin_max_curvature_rate: *infeasability.get("Curvature").unwrap(),
+        };
+
+        Ok(tl)
+    })?;
+
+    ittt.collect()
+}
+
 pub fn spawn_trajectories(
     mut commands: Commands,
     args: Res<crate::args::Args>,
 
-    _polyline_assets: ResMut<Assets<Polyline>>,
-    mut material_assets: ResMut<Assets<PolylineMaterial>>,
+    // _polyline_assets: ResMut<Assets<Polyline>>,
+    // mut material_assets: ResMut<Assets<PolylineMaterial>>,
 ) {
     let main_trajectories_path = std::path::Path::join(&args.logs, "logs.csv");
     let main_trajectories = match log::read_main_log(&main_trajectories_path) {
@@ -312,40 +451,14 @@ pub fn spawn_trajectories(
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
     ).unwrap();
 
-    let mut stmt = conn.prepare(
-        "SELECT json_extract(value, '$.vehicle') FROM meta WHERE key = 'config_sim'"
-    ).unwrap();
-    let vparams: VehicleParams = stmt.query_row([], |row| {
-        let rusqlite::types::ValueRef::Text(st) = row.get_ref(0)? else { todo!() };
-        let rstr = std::str::from_utf8(st)?;
-        let data: VehicleParams = miniserde::json::from_str(rstr).map_err(|err| {
-            return rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(err));
-        })?;
-
-        Ok(data)
-    }).unwrap();
+    let vparams = read_vehicle_params(&conn).unwrap();
 
     commands.insert_resource(vparams.clone());
 
-    let mut stmt = conn.prepare(
-        "SELECT time_step, id, x, y, theta, kappa, curvilinear_theta, v, a FROM trajectories"
-    ).unwrap();
-    let ittt = stmt.query_map([], |row| {
-        Ok(KinematicData {
-            x_positions_m: {
-                let rusqlite::types::ValueRef::Text(st) = row.get_ref(2)? else { todo!() };
-                let rstr = std::str::from_utf8(st)?;
-                let data: Vec<f32> = miniserde::json::from_str(rstr).unwrap();
-                data
-            },
-            y_positions_m: todo!(),
-            theta_orientations_rad: todo!(),
-            kappa_rad: todo!(),
-            curvilinear_orientations_rad: todo!(),
-            velocities_mps: todo!(),
-            accelerations_mps2: todo!(),
-        })
-    }).unwrap();
+    let traj = read_trajectories(&conn).unwrap();
+    for row in traj.iter().take(10) {
+        bevy::log::info!("row={:#?}", row);
+    }
 
     let trajectories_path = std::path::Path::join(&args.logs, "trajectories.csv");
     let io_pool = bevy::tasks::TaskPoolBuilder::new()
@@ -368,6 +481,7 @@ pub fn spawn_trajectories(
 
     // let rdr = Arc::new(rdr);
 
+    /*
     let (sender, receiver) = std::sync::mpsc::channel();
     let buf = std::sync::Arc::new(thingbuf::ThingBuf::<csv::StringRecord>::new(64));
 
@@ -403,12 +517,12 @@ pub fn spawn_trajectories(
     // for _ in 0..6 {
     //for _ in 0..1 
     
-    let h_mat = material_assets.add(PolylineMaterial {
-        width: 3.0,
-        color: Color::hsl(145.0, 0.7, 0.5),
-        perspective: true,
-        ..default()
-    });
+    // let h_mat = material_assets.add(PolylineMaterial {
+    //     width: 3.0,
+    //     color: Color::hsl(145.0, 0.7, 0.5),
+    //     perspective: true,
+    //     ..default()
+    // });
     
     let _res: Vec<Result<(), ()>> = io_pool.scope(|s| {
         //let done = done.
@@ -464,10 +578,18 @@ pub fn spawn_trajectories(
     });
 
     drop(sender);
+*/
 
     let mut max_costs = f64::MIN_POSITIVE;
     let mut ts_map = BTreeMap::new();
-    for (ts, (bundle, extra_bundle, costs)) in receiver.iter() {
+    let bundles = traj
+        .iter()
+        .filter_map(|tl| {
+            let bundle = make_trajectory_bundle(&tl)?;
+            Some((tl.time_step, bundle))
+        });
+    // for (ts, (bundle, extra_bundle, costs)) in receiver.iter() {
+    for (ts, (bundle, extra_bundle, costs)) in bundles {
         let ts_entity = ts_map.entry(ts).or_insert_with(|| {
             commands
                 .spawn((
@@ -489,13 +611,12 @@ pub fn spawn_trajectories(
 
     commands.insert_resource(MaxCosts { max_costs });
 
+    /*
     for task in task_list.into_iter() {
         bevy::tasks::block_on(async { task.await })
             .expect("error running deserialization task");
     }
-
-    // let ego_width = 1.941;
-    // let ego_length = 4.973;
+    */
     
     bevy::log::info!("using vparams: {:?}", vparams);
 
@@ -1487,7 +1608,8 @@ pub(crate) fn trajectory_list(
                     feasible.len()
                 };
 
-                body.rows(18.0, count, |row_index, row| {
+                body.rows(18.0, count, |mut row| {
+                    let row_index = row.index();
                     let entity = if *show_infeasible {
                         *children.get(row_index).unwrap()
                     } else {

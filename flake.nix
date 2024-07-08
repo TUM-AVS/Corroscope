@@ -161,6 +161,7 @@
             let
               pkgs = import nixpkgs { inherit system; overlays = [ fenix.overlays.default ]; };
             in [
+            pkgs.bloaty
             pkgs.tracy
 
             pkgs.rust-analyzer-nightly

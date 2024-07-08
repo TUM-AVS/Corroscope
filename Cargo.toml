@@ -7,37 +7,36 @@ license = "LGPL-3.0-or-later"
 categories = [ "science::robotics", "visualization" ]
 
 [dependencies]
-bevy = { version = "^0.12.0", default-features = false, features = [
+bevy = { version = "^0.13.0", default-features = false, features = [
     "bevy_asset",
     "bevy_core_pipeline",
     "bevy_render",
     "bevy_winit",
-    "wayland",
-    "x11",
     "multi-threaded"
-    ] }
-bevy_prototype_lyon = "^0.10.0"
-bevy_egui = { version = "^0.24.0", default-features = false, features = [ "manage_clipboard" ] }
-bevy_pancam = { version = "0.10", features = [ "bevy_egui" ] }
-bevy_mod_picking = { version = "0.17.0", default-features = false, features = [
+] }
+bevy_prototype_lyon = "^0.11.0"
+bevy_egui = { version = "^0.27.1", default-features = false, features = [ "manage_clipboard" ] }
+bevy_pancam = { version = "0.11.1", features = [ "bevy_egui" ] }
+bevy_mod_picking = { version = "0.19.1", default-features = false, features = [
     "backend_egui",
     "backend_raycast",
     "selection",
 ] }
 
-bevy_eventlistener = "0.6.0"
+bevy_eventlistener = "0.7"
 
-bevy_framepace = { version = "0.14.1", optional = true }
+bevy_framepace = { version = "0.16.0", optional = true }
 
-bevy-inspector-egui = { version = "0.22.1", optional = true, default-features = false }
-bevy_editor_pls = { version = "0.7.0", optional = true }
+bevy-inspector-egui = { version = "0.24.0", optional = true, default-features = false }
+bevy_editor_pls = { version = "0.8.1", optional = true }
 
-bevy_mod_debugdump = { version = "0.9.0", optional = true }
+bevy_mod_debugdump = { version = "0.10.0", optional = true }
 
-egui = { version = "0.24.0", features = [
+egui = { version = "0.27.2", features = [
     "mint",
 ] }
-egui_plot = "0.24.0"
+egui_plot = "0.27.2"
+egui_extras = "0.27.2"
 
 mint = "^0.5.9"
 
@@ -64,25 +63,26 @@ itertools = "0.11.0"
 memmap2 = "0.7.1"
 futures-lite = "1.13.0"
 thingbuf = "0.1.4"
-egui_extras = "0.24.0"
 
 colorous = "1.0.12"
 
 rusqlite = { version = "0.29.0", features = ["bundled"] } # , features = ["blob"]
 
-bevy_polyline = "0.8.1"
+bevy_polyline = "0.9.0"
 
 [build-dependencies]
 prost-build = "0.12.6"
 
 [features]
-default = [ "dev", "framepace" ]
+default = [ "dev", "framepace", "wayland", "x11" ]
 framepace = ["dep:bevy_framepace"]
 dynamic_linking = ["bevy/dynamic_linking"]
 export_schedule = ["dep:bevy_mod_debugdump"]
 debug_picking = ["bevy_mod_picking/debug"]
 editor = ["dep:bevy_editor_pls"]
 inspector = ["bevy-inspector-egui"]
+wayland = ["bevy/wayland"]
+x11 = ["bevy/x11"]
 dev = [
     # "dynamic_linking",
     # "bevy/bevy_dev_tools",
@@ -94,6 +94,7 @@ dev = [
 # Enable max optimizations for dependencies, but not for our code:
 [profile.dev.package."*"]
 opt-level = 3
+debug = "line-tables-only"
 
 [profile.dev]
 opt-level = 1

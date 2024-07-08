@@ -55,8 +55,8 @@ fn egui_wants_input(
 fn egui_block_input(
     state: Res<EguiBlockInputState>,
 
-    mut keys: ResMut<Input<KeyCode>>,
-    mut mouse_buttons: ResMut<Input<MouseButton>>,
+    mut keys: ResMut<ButtonInput<KeyCode>>,
+    mut mouse_buttons: ResMut<ButtonInput<MouseButton>>,
 ) {
     if state.wants_keyboard_input {
         keys.reset_all();
@@ -116,7 +116,7 @@ fn egui_block_picking(
 
     bevy::log::debug!("setting picking enabled to {}", picking_enable);
 
-    picking_settings.enable = picking_enable;
+    picking_settings.is_enabled = picking_enable;
 }
 
 fn update_ui_scale_factor(

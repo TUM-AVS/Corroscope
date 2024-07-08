@@ -51,8 +51,6 @@ fn main() -> color_eyre::eyre::Result<()> {
                 title: "Corroscope".into(),
                 // present_mode: bevy::window::PresentMode::AutoNoVsync,
                 present_mode: bevy::window::PresentMode::AutoVsync,
-                // Tells wasm to resize the window according to the available canvas
-                fit_canvas_to_parent: true,
                 // Tells wasm not to override default event handling, like F5, Ctrl+R etc.
                 prevent_default_event_handling: false,
                 ..default()
@@ -73,14 +71,15 @@ fn main() -> color_eyre::eyre::Result<()> {
     app.insert_resource(ClearColor(Color::rgb_u8(105, 105, 105)))
         .add_plugins(bevy_egui::EguiPlugin)
         .add_plugins(bevy_prototype_lyon::prelude::ShapePlugin)
-        .add_plugins(bevy_polyline::PolylinePlugin)
+        // .add_plugins(bevy_polyline::PolylinePlugin)
         .add_plugins(bevy_pancam::PanCamPlugin);
 
     // Picking
     app.add_plugins(DefaultPickingPlugins).insert_resource(
-        bevy_mod_picking::selection::SelectionSettings {
+        bevy_mod_picking::selection::SelectionPluginSettings {
             click_nothing_deselect_all: true,
             use_multiselect_default_inputs: false,
+            is_enabled: true,
         },
     );
 
@@ -166,7 +165,8 @@ pub(crate) struct MainCamera;
 #[derive(Component)]
 // #[component(storage = "SparseSet")]
 pub(crate) struct MainCamera3d;
-fn camera_setup(mut commands: Commands) {
+
+pub(crate) fn camera_setup(mut commands: Commands) {
     let ortho = OrthographicProjection {
         scale: 0.1, // 0.001,
         ..default()
@@ -177,6 +177,7 @@ fn camera_setup(mut commands: Commands) {
         RaycastSource::<()>::new_cursor(),
         Camera2dBundle {
             projection: ortho.clone(),
+            tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::None,
             ..Camera2dBundle::new_with_far(250.0)
         },
         bevy_pancam::PanCam::default(),
@@ -190,12 +191,10 @@ fn camera_setup(mut commands: Commands) {
             camera: Camera {
                 order: 1,
                 hdr: false,
+                clear_color: ClearColorConfig::None,
                 ..default()
             },
-            camera_3d: Camera3d {
-                clear_color: bevy::core_pipeline::clear_color::ClearColorConfig::None,
-                ..default()
-            },
+            tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::None,
             ..default()
         },
     ));
