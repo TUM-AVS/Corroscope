@@ -312,7 +312,7 @@ pub fn spawn_trajectories(
     ).unwrap();
 
     let mut stmt = conn.prepare(
-        "SELECT json_extract(value, '$.vehicle') FROM meta WHERE key = 'config'"
+        "SELECT json_extract(value, '$.vehicle') FROM meta WHERE key = 'config_sim'"
     ).unwrap();
     let vparams: VehicleParams = stmt.query_row([], |row| {
         let rusqlite::types::ValueRef::Text(st) = row.get_ref(0)? else { todo!() };
