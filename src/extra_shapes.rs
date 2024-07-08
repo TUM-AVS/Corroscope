@@ -66,6 +66,11 @@ impl Geometry for Polyline {
             // b.add_line_segment(&lseg);
         }
          */
+
+        if self.points.is_empty() {
+            return;
+        }
+
         b.reserve(self.points.len(), 0);
 
         let pt0 = self.points.first().unwrap();

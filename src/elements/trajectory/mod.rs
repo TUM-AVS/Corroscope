@@ -86,6 +86,9 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
     if !points.iter().all(|v| v.x.is_finite() && v.y.is_finite()) {
         return None;
     }
+    if points.is_empty() {
+        return None;
+    }
 
     let traj_shape = crate::extra_shapes::Polyline {
         points
