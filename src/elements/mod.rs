@@ -44,6 +44,10 @@ impl Plugin for ElementsPlugin {
                     ),
                 ).chain()
             )
+            .add_systems(
+                PostUpdate,
+                fix_render_asset_usages.after(bevy_prototype_lyon::plugin::BuildShapes)
+            )
             .add_event::<trajectory::SelectTrajectoryEvent>()
             .add_systems(PostUpdate, trajectory::update_selected_trajectory);
 
@@ -53,6 +57,20 @@ impl Plugin for ElementsPlugin {
     }
 }
 
+fn fix_render_asset_usages(
+    mut meshes: ResMut<Assets<Mesh>>,
+    query: Query<
+        (&mut bevy::sprite::Mesh2dHandle),
+        (Changed<bevy::sprite::Mesh2dHandle>, Or<(With<bevy_prototype_lyon::draw::Stroke>, With<bevy_prototype_lyon::draw::Fill>)>),
+    >,
+) {
+    for mesh_handle in query.iter() {
+        use bevy::render::render_asset::RenderAssetUsages;
+
+        let m = meshes.get_mut(&mesh_handle.0).unwrap();
+        m.asset_usage = RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD;
+    }
+}
 
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
@@ -85,9 +103,11 @@ pub(crate) fn show_generic_tooltips(mut contexts: bevy_egui::EguiContexts, toolt
 
     let base_id = egui::Id::new("ref path tooltip");
 
+    let layer_id = egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("generic tooltips"));
+
     for (entity, tooltip) in tooltip_q.iter() {
         let id = base_id.with(entity);
-        egui::containers::show_tooltip(ctx, id, |ui| {
+        egui::containers::show_tooltip(ctx, layer_id, id, |ui| {
             ui.heading(tooltip.text.clone());
         });
     }

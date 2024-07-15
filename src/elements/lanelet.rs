@@ -53,7 +53,7 @@ fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> 
     let dashed_path = Path(make_dashed(&rb_path.0, 0.8, 0.5));
     let short_dashed_path = Path(make_dashed(&rb_path.0, 0.2, 0.5));
 
-    let marking_color = Color::CRIMSON;
+    let marking_color = bevy::color::palettes::css::CRIMSON.into();
     let stroke_opts = {
         let mut opts = StrokeOptions::default();
         // opts.start_cap = LineCap::Round;
@@ -75,8 +75,9 @@ fn spawn_bound(bound: &commonroad_pb::Bound, z_idx: f32) -> Option<impl Bundle> 
             opts
         },
     };
+    let base: bevy::color::LinearRgba = bevy::color::palettes::css::VIOLET.into();
     let light_stroke = Stroke {
-        color: Color::VIOLET + Color::hsl(0.0, -0.15, -0.35),
+        color: (base + Hsla::hsl(0.0, -0.15, -0.35).into()).into(),
         options: {
             let mut opts = stroke_opts;
             opts.line_width = 0.02;
@@ -173,7 +174,7 @@ pub fn spawn_lanelet(commands: &mut Commands, lanelet: &commonroad_pb::Lanelet, 
                 },
                 ..default()
             },
-            Fill::color(Color::GRAY),
+            Fill::color(bevy::color::palettes::css::GRAY),
         ))
         .set_parent_in_place(main_entity);
 

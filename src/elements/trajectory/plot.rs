@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use egui_plot::PlotPoint;
+use egui_plot::{Legend, PlotPoint};
 
 pub(crate) struct TrajectoryPlotData {
     velocity: egui_plot::Line,
@@ -13,6 +13,8 @@ pub(crate) struct TrajectoryPlotData {
     curvilinear_orientation_ref: egui_plot::Line,
     kappa: egui_plot::Line,
     kappa_ref: egui_plot::Line,
+    trajectory_long: egui_plot::Line,
+    trajectory_lat: egui_plot::Line,
     initial_velocity: f32,
 }
 
@@ -31,6 +33,8 @@ pub struct CachedTrajectoryPlotData {
     curvilinear_orientation_ref: Vec<[f64; 2]>,
     kappa: Vec<[f64; 2]>,
     kappa_ref: Vec<[f64; 2]>,
+    trajectory_long: Vec<[f64; 2]>,
+    trajectory_lat: Vec<[f64; 2]>,
 }
 
 impl CachedTrajectoryPlotData {
@@ -60,6 +64,9 @@ impl CachedTrajectoryPlotData {
         let kappa = traj.kappa_plot_data();
         let kappa_ref = mtraj.kinematic_data.kappa_plot_data(None);
 
+        let trajectory_long: Vec<[f64; 2]> = traj.trajectory_long_plot_data();
+        let trajectory_lat: Vec<[f64; 2]> = traj.trajectory_lat_plot_data();
+
         Self {
             time_step: traj.time_step,
             trajectory_number: traj.trajectory_number,
@@ -74,6 +81,8 @@ impl CachedTrajectoryPlotData {
             curvilinear_orientation_ref,
             kappa,
             kappa_ref,
+            trajectory_long,
+            trajectory_lat,
         }
     }
 }
@@ -115,6 +124,9 @@ impl TrajectoryPlotData {
 
         let initial_velocity = plot_data.velocity.first().unwrap()[1] as f32;
 
+        let trajectory_long = egui_plot::Line::new(plot_data.trajectory_long.clone()).name("longitudinal");
+        let trajectory_lat = egui_plot::Line::new(plot_data.trajectory_lat.clone()).name("lateral");
+
         Self {
             velocity,
             velocity_ref,
@@ -127,6 +139,8 @@ impl TrajectoryPlotData {
             kappa,
             kappa_ref,
             initial_velocity,
+            trajectory_long,
+            trajectory_lat
         }
     }
 }
@@ -142,6 +156,20 @@ pub(crate) fn plot_traj(
     let group = egui::Id::new("trajectory plot group");
 
     let plot_width = ui.available_width();
+
+    let base_plot = |name: &'static str| {
+        egui_plot::Plot::new(name)
+            // .legend(egui_plot::Legend::default().position(egui_plot::Corner::LeftBottom))
+            // .allow_drag(false)
+            // .allow_zoom(false)
+            .view_aspect(2.0)
+            .min_size(egui::Vec2::new(150.0, 75.0))
+            .sharp_grid_lines(true)
+            // .include_x(0.0)
+            // .include_y(0.0)
+            .width(plot_width)
+            .link_cursor(group, true, false)
+    };
 
     let plot = |name: &'static str| {
         egui_plot::Plot::new(name)
@@ -170,6 +198,40 @@ pub(crate) fn plot_traj(
     let ts_vline = egui_plot::VLine::new(time_step)
         // .name("current time step")
         .style(egui_plot::LineStyle::Dotted { spacing: 0.1 });
+
+    ui.heading("Longitudinal");
+    let _velocity_plot: egui_plot::PlotResponse<()> = base_plot("long_plot")
+        .y_grid_spacer(egui_plot::uniform_grid_spacer(|_grid_input| {
+            [10.0, 2.0, 0.5]
+        }))
+        // .label_formatter(unit_label_formatter("m/s"))
+        .show(ui, |pui| {
+            pui.line(plot_data.trajectory_long);
+
+            // pui.line()
+
+            pui.vline(ts_vline.clone());
+
+            if let Some(pointer) = pui.pointer_coordinate() {
+                cursor_x = Some(pointer.x);
+            }
+        });
+    ui.heading("Lateral");
+    let _velocity_plot: egui_plot::PlotResponse<()> = base_plot("lat_plot")
+        .y_grid_spacer(egui_plot::uniform_grid_spacer(|_grid_input| {
+            [10.0, 2.0, 0.5]
+        }))
+        // .label_formatter(unit_label_formatter("m/s"))
+        .show(ui, |pui| {
+            pui.line(plot_data.trajectory_lat);
+
+            pui.vline(ts_vline.clone());
+
+            if let Some(pointer) = pui.pointer_coordinate() {
+                cursor_x = Some(pointer.x);
+            }
+        });
+    
 
     ui.heading("Velocity");
     let _velocity_plot = plot("velocity_plot")
@@ -218,7 +280,7 @@ pub(crate) fn plot_traj(
                 egui_plot::HLine::new(a_max).style(egui_plot::LineStyle::Dashed { length: 10.0 }),
             ); //.name("maximum acceleration"));
             pui.hline(
-                egui_plot::HLine::new(-a_max)
+                egui_plot::HLine::new(-vparams.a_max)
                     .style(egui_plot::LineStyle::Dashed { length: 10.0 }),
             ); //.name("minimum acceleration"));
 

@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
+use backends::raycast::RaycastPickable;
 use bevy::prelude::*;
 
 use bevy_mod_picking::prelude::*;
@@ -118,7 +119,7 @@ fn make_trajectory_bundle(traj: &TrajectoryLog) -> Option<(impl Bundle, Option<i
         On::<Pointer<Over>>::target_insert(HoveredTrajectory),
         On::<Pointer<Out>>::target_remove::<HoveredTrajectory>(),
         PickableBundle::default(),
-        // RaycastPickTarget::default(),
+        RaycastPickable,
     );
 
     let extra_bundle = if traj.costs.values().any(|v| !v.is_finite()) {
@@ -150,7 +151,7 @@ fn make_polyline_trajectory_bundle(
     
     let h_mat = material_assets.add(PolylineMaterial {
         width: 3.0,
-        color: traj.color(300.0),
+        color: traj.color(300.0).into(),
         perspective: true,
         ..default()
     });
@@ -245,7 +246,7 @@ fn make_main_trajectory_bundle(main_trajectories: &[MainLog]) -> (MainTrajectory
                 },
                 ..default()
             },
-            Stroke::new(Color::rgba(0.4, 0.6, 0.18, 0.7), 0.15),
+            Stroke::new(Color::srgba(0.4, 0.6, 0.18, 0.7), 0.15),
         ),
     )
 }
@@ -328,7 +329,6 @@ fn read_trajectories(
     )?;
     let cost_names = filter_column_names(stmt);
 
-
     bevy::log::info!("column names done");
 
     // let cost_names = stmt
@@ -360,15 +360,14 @@ fn read_trajectories(
             INNER JOIN infeasability USING (time_step, id)"
     )?;
     let names = stmt.column_names();
-    bevy::log::info!("names={:#?}", names);
+    bevy::log::trace!("names={:#?}", names);
 
-
-    bevy::log::info!("COUNT={}", count);
+    bevy::log::debug!("count={}", count);
     
     let mut idx = 1;
 
     let ittt = stmt.query_map([], |row| {
-        bevy::log::info!("{}/{}", idx, count);
+        bevy::log::trace!("{}/{}", idx, count);
         idx += 1;
 
         let convert = |idx| -> rusqlite::Result<Vec<f32>> {
@@ -385,6 +384,8 @@ fn read_trajectories(
             curvilinear_orientations_rad: convert("curvilinear_theta")?,
             velocities_mps: convert("v")?,
             accelerations_mps2: convert("a")?,
+            trajectory_long: convert("trajectory_long")?,
+            trajectory_lat: convert("trajectory_lat")?,
         };
 
         let fetch_map = |names: &Vec<String>| -> rusqlite::Result<_> {
@@ -393,9 +394,15 @@ fn read_trajectories(
                 .map(|name| Ok((name.clone(), row.get(name.as_str())?)) )
                 .collect::<rusqlite::Result<HashMap<_, _>>>()?)
         };
+        let fetch_map_i32 = |names: &Vec<String>| -> rusqlite::Result<_> {
+            Ok(names
+                .iter()
+                .map(|name| Ok((name.clone(), row.get(name.as_str())?)) )
+                .collect::<rusqlite::Result<HashMap<_, _>>>()?)
+        };
 
         let costs: HashMap<String, f64> = fetch_map(&cost_names)?;
-        let infeasability: HashMap<String, f64> = fetch_map(&inf_names)?;
+        let infeasability: HashMap<String, i32> = fetch_map_i32(&inf_names)?;
 
         let tl = TrajectoryLog {
             time_step: row.get("time_step")?,
@@ -403,21 +410,21 @@ fn read_trajectories(
             trajectory_number: -1,
             unique_id: row.get("id")?,
             feasible: row.get("feasible")?,
-            // TODO: add
-            horizon: -1.0,
+            horizon: row.get("horizon")?,
             dt: row.get("dt")?,
             kinematic_data: kd,
             s_position_m: row.get("s_position")?,
             d_position_m: row.get("d_position")?,
             ego_risk: row.get("ego_risk")?,
             obst_risk: row.get("obst_risk")?,
+            collision_detected: row.get("collision_detected")?,
+            boundary_harm: row.get("boundary_harm")?,
             costs_cumulative_weighted: row.get("costs_cumulative_weighted")?,
             costs,
-            inf_kin_yaw_rate: *infeasability.get("Yaw_rate").unwrap(),
-            inf_kin_acceleration: *infeasability.get("Acceleration").unwrap(),
-            inf_kin_max_curvature: *infeasability.get("Curvature").unwrap(),
-            // todo
-            inf_kin_max_curvature_rate: *infeasability.get("Curvature").unwrap(),
+            inf_kin_yaw_rate: *infeasability.get("inf_yaw_rate").unwrap(),
+            inf_kin_acceleration: *infeasability.get("inf_acceleration").unwrap(),
+            inf_kin_max_curvature: *infeasability.get("inf_curvature").unwrap(),
+            inf_kin_max_curvature_rate: *infeasability.get("inf_curvature_rate").unwrap(),
         };
 
         Ok(tl)
@@ -456,9 +463,6 @@ pub fn spawn_trajectories(
     commands.insert_resource(vparams.clone());
 
     let traj = read_trajectories(&conn).unwrap();
-    for row in traj.iter().take(10) {
-        bevy::log::info!("row={:#?}", row);
-    }
 
     let trajectories_path = std::path::Path::join(&args.logs, "trajectories.csv");
     let io_pool = bevy::tasks::TaskPoolBuilder::new()
@@ -645,7 +649,7 @@ pub fn spawn_trajectories(
             radius: 0.1,
         };
         let wheel_fill = {
-            let mut fill = Fill::color(Color::DARK_GRAY);
+            let mut fill = Fill::color(bevy::color::palettes::css::DARK_SLATE_GRAY);
             fill.options.handle_intersections = false;
             fill.options.tolerance = 1e-3;
             fill
@@ -681,7 +685,7 @@ pub fn spawn_trajectories(
                     fill
                 },
                 {
-                    let mut stroke = Stroke::new(Color::ORANGE_RED, 0.1);
+                    let mut stroke = Stroke::new(bevy::color::palettes::css::ORANGE_RED, 0.1);
                     stroke.options.tolerance = 1e-2;
                     // stroke.options.line_join = LineJoin::Round;
                     // stroke.options.start_cap = LineCap::Round;
@@ -704,7 +708,7 @@ pub fn spawn_trajectories(
                             },
                             ..default()
                         },
-                        Fill::color(Color::GRAY),
+                        Fill::color(bevy::color::palettes::css::GRAY),
                         super::HoverTooltip::bundle("Rear Wheelbase"),
                     )).with_children(|builder| {
                         builder.spawn((
@@ -749,7 +753,7 @@ pub fn spawn_trajectories(
                             },
                             ..default()
                         },
-                        Fill::color(Color::GRAY),
+                        Fill::color(bevy::color::palettes::css::GRAY),
                         super::HoverTooltip::bundle("Front Wheelbase"),
                     )).with_children(|builder| {
                         let curvature = *mtraj_res.kinematic_data.kappa_rad.get(ts_idx).unwrap();
@@ -807,7 +811,7 @@ pub(crate) fn trajectory_group_visibility(
         return;
     }
     let time_step = time_step.time_step;
-    bevy::log::info!("updating group visibility");
+    bevy::log::debug!("updating group visibility");
 
     for (entity, traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.time_step == time_step {
@@ -829,7 +833,7 @@ pub(crate) fn trajectory_visibility(
         return;
     }
 
-    bevy::log::info!("updating traj visibility");
+    bevy::log::debug!("updating traj visibility");
 
     for (traj, mut visibility) in trajectory_q.iter_mut() {
         if traj.feasible || settings.show_infeasible {
@@ -865,6 +869,7 @@ pub(crate) fn trajectory_tooltip(
     let ctx = contexts.ctx_mut();
 
     let base_id = egui::Id::new("traj tooltip");
+    let layer_id = egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("trajectory tooltips"));
 
     if trajectory_q.is_empty() {
         return;
@@ -872,11 +877,12 @@ pub(crate) fn trajectory_tooltip(
 
     egui::containers::show_tooltip(
         ctx,
+        layer_id,
         base_id, //.with(traj.unique_id),
         // Some(tt_pos),
         |ui| {
             for traj in trajectory_q.iter() {
-                ui.heading(format!("Trajectory {}", traj.trajectory_number));
+                ui.heading(format!("Trajectory {}", traj.unique_id));
                 // ui.label(format!("type: {:#?}", obs.obstacle_type()));
 
                 ui.label(format!("feasible: {}", traj.feasible));
@@ -957,8 +963,8 @@ fn trajectory_description(
     ui.horizontal_top(|ui| {
         ui.label(
             egui::RichText::new(format!(
-                "Trajectory {} (id: {})",
-                traj.trajectory_number, traj.unique_id
+                "Trajectory {}",
+                traj.unique_id,
             ))
             .heading()
             .size(26.0),
@@ -1008,6 +1014,24 @@ fn trajectory_description(
                 rich_label!(ui, obst_risk, "{:.3}");
             });
         }
+
+        ui.horizontal_top(|ui| {
+            ui.label("collision detected:");
+
+            if let Some(collision_detected) = traj.collision_detected {
+                ui.label(egui::RichText::new(collision_detected.to_string()).strong());
+            } else {
+                let text = egui::RichText::new("unknown").italics().weak();
+                ui.label(text);
+            }
+        });
+
+        if let Some(boundary_harm) = traj.boundary_harm {
+            ui.horizontal_top(|ui| {
+                ui.label("boundary harm:");
+                rich_label!(ui, boundary_harm, "{:.3}");
+            });
+        }
     };
 
     use egui_extras::{Column, TableBuilder};
@@ -1034,7 +1058,7 @@ fn trajectory_description(
                         });
                         row.col(|ui| {
                             ui.with_layout(value_cell_layout, |ui| {
-                                rich_label!(ui, traj.horizon, "{}\u{2006}s");
+                                rich_label!(ui, traj.horizon, "{:.3}\u{2006}s");
                             });
                         });
                     });
@@ -1052,7 +1076,7 @@ fn trajectory_description(
         });
     };
     egui_extras::StripBuilder::new(ui)
-        .size(egui_extras::Size::initial(70.0))
+        .size(egui_extras::Size::initial(80.0))
         .size(egui_extras::Size::remainder())
         .vertical(|mut strip| {
             strip.strip(|builder| {
@@ -1169,12 +1193,12 @@ fn trajectory_description(
                                         });
                                         row.col(|ui| {
                                             ui.with_layout(value_cell_layout, |ui| {
-                                                let inf_val: f64 = traj.$inf_name;
+                                                let inf_val: i32 = traj.$inf_name;
                                                 let text = egui::RichText::new(format!(
                                                     "{:>5.0}",
                                                     inf_val
                                                 )).monospace();
-                                                let resp = ui.label(if inf_val == 0.0 {
+                                                let resp = ui.label(if inf_val == 0 {
                                                     text.weak()
                                                 } else {
                                                     text
@@ -1311,7 +1335,7 @@ pub(crate) fn trajectory_window(
                                         },
                                         ..default()
                                     },
-                                    Fill::color(Color::ORANGE_RED.with_a(0.6)),
+                                    Fill::color(bevy::color::palettes::css::ORANGE_RED.with_alpha(0.6)),
                                 ));
                             });
                         }
@@ -1356,10 +1380,10 @@ macro_rules! rich_label {
 
 #[derive(Default, PartialEq, Eq, Resource)]
 pub(crate) enum TrajectorySortKey {
-    #[default]
     ID,
     MaxCurvilinearDeviation,
     FinalVelocity,
+    #[default]
     Cost,
 }
 
@@ -1502,7 +1526,10 @@ pub(crate) fn trajectory_list(
     let selected_idx = selected_q
         .get_single()
         .ok()
-        .and_then(|selected| children.iter().position(|entity| *entity == selected));
+        .and_then(|selected| {
+            let mut it = if *show_infeasible { children.iter() } else { feasible.iter() };
+            it.position(|entity| *entity == selected)
+        });
 
     let value_cell_layout = egui::Layout::left_to_right(egui::Align::Center)
         .with_main_align(egui::Align::Max)
@@ -1526,6 +1553,8 @@ pub(crate) fn trajectory_list(
 
                 if !traj.feasible {
                     ui.label(egui::RichText::new("(infeasible)").italics().weak());
+                } else if traj.collision_detected.unwrap_or(false) {
+                    ui.label(egui::RichText::new("\u{21AF}").color(egui::Color32::RED).weak());
                 } else {
                     ui.label(egui::RichText::new("\u{2714}").italics().weak());
 
@@ -1608,7 +1637,7 @@ pub(crate) fn trajectory_list(
                     feasible.len()
                 };
 
-                body.rows(18.0, count, |mut row| {
+                body.rows(18.0, count, |row| {
                     let row_index = row.index();
                     let entity = if *show_infeasible {
                         *children.get(row_index).unwrap()

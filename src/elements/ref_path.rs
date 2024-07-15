@@ -17,8 +17,10 @@ pub struct HoveredRefPath;
 pub fn ref_path_tooltip(mut contexts: bevy_egui::EguiContexts, ref_path_q: Query<&HoveredRefPath>) {
     let ctx = contexts.ctx_mut();
 
+    let layer_id = egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("ref path tooltips"));
+
     if !ref_path_q.is_empty() {
-        egui::containers::show_tooltip(ctx, egui::Id::new("ref path tooltip"), |ui| {
+        egui::containers::show_tooltip(ctx, layer_id, egui::Id::new("ref path tooltip"), |ui| {
             ui.heading("Reference Path");
         });
     }

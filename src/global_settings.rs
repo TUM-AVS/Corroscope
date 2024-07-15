@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::RequestRedraw};
 
 use bevy_egui::EguiContexts;
 
@@ -8,8 +8,12 @@ impl Plugin for GlobalSettingsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GlobalSettings>()
             .init_resource::<TimeStep>()
-            .add_systems(Update, side_panel)
-            .add_systems(Update, animate_time);
+            .add_systems(Update, 
+                (
+                    (animate_time, side_panel),
+                    request_redraw
+                ).chain()
+            );
     }
 }
 
@@ -45,6 +49,15 @@ impl CurrentTimeStep {
 #[derive(Default, Resource)]
 pub struct TimeStep {
     pub time_step: i32,
+}
+
+pub fn request_redraw(
+    cts: Res<CurrentTimeStep>,
+    mut redraw_request_events: EventWriter<RequestRedraw>,
+) {
+    if cts.is_changed() {
+        redraw_request_events.send(RequestRedraw);
+    }
 }
 
 pub fn animate_time(
@@ -113,7 +126,7 @@ pub fn side_panel(
                 };
                 let symbol_button = |c: char| {
                     egui::Button::new(symbol_text(c))
-                        .wrap(false)
+                        .wrap_mode(egui::TextWrapMode::Truncate)
                         .min_size(egui::Vec2::splat(50.0))
                         .sense(egui::Sense::click_and_drag())
                 };

@@ -63,6 +63,10 @@ pub(crate) struct KinematicData {
     pub(crate) velocities_mps: Vec<f32>,
     #[serde(deserialize_with = "deserialize_float_list")]
     pub(crate) accelerations_mps2: Vec<f32>,
+    #[serde(deserialize_with = "deserialize_float_list")]
+    pub(crate) trajectory_long: Vec<f32>,
+    #[serde(deserialize_with = "deserialize_float_list")]
+    pub(crate) trajectory_lat: Vec<f32>,
 }
 
 impl KinematicData {
@@ -102,6 +106,14 @@ impl KinematicData {
     pub(crate) fn curvilinear_orientation_plot_data(&self, shift: Option<i32>) -> Vec<[f64; 2]> {
         Self::make_plot_data(&self.curvilinear_orientations_rad, shift)
     }
+
+    pub(crate) fn trajectory_long_plot_data(&self, shift: Option<i32>) -> Vec<[f64; 2]> {
+        Self::make_plot_data(&self.trajectory_long, shift)
+    }
+
+    pub(crate) fn trajectory_lat_plot_data(&self, shift: Option<i32>) -> Vec<[f64; 2]> {
+        Self::make_plot_data(&self.trajectory_lat, shift)
+    }
 }
 
 #[derive(Debug, serde::Deserialize, Clone, Component, Default, Reflect)]
@@ -124,15 +136,17 @@ pub(crate) struct TrajectoryLog {
 
     pub(crate) ego_risk: Option<f64>,
     pub(crate) obst_risk: Option<f64>,
+    pub(crate) collision_detected: Option<bool>,
+    pub(crate) boundary_harm: Option<f64>,
     pub(crate) costs_cumulative_weighted: f64,
 
     #[serde(flatten)]
     pub(crate) costs: std::collections::HashMap<String, f64>,
 
-    pub(crate) inf_kin_yaw_rate: f64,
-    pub(crate) inf_kin_acceleration: f64,
-    pub(crate) inf_kin_max_curvature: f64,
-    pub(crate) inf_kin_max_curvature_rate: f64,
+    pub(crate) inf_kin_yaw_rate: i32,
+    pub(crate) inf_kin_acceleration: i32,
+    pub(crate) inf_kin_max_curvature: i32,
+    pub(crate) inf_kin_max_curvature_rate: i32,
 }
 
 impl TrajectoryLog {
@@ -152,7 +166,7 @@ impl TrajectoryLog {
     }
 
     pub(crate) fn selected_stroke(&self, max_cost: f64) -> Stroke {
-        Self::stroke(self.selected_color(max_cost), 0.02)
+        Self::stroke(self.selected_color(max_cost), 0.04)
     }
 
    pub(crate) fn color(&self, max_cost: f64) -> Color {
@@ -181,7 +195,7 @@ impl TrajectoryLog {
                 let grad_color = GRAD.eval_continuous(unit_cost);
                 let c = Color::rgb_u8(grad_color.r, grad_color.g, grad_color.b);
                 bevy::log::trace!("color={:?}", c);
-                c.with_a(0.7)
+                c.with_alpha(0.7)
             }
         } else {
             Color::rgba_u8(30, 70, 190, 100)
@@ -189,8 +203,8 @@ impl TrajectoryLog {
     }
 
     pub(crate) fn selected_color(&self, max_cost: f64) -> Color {
-        let base_color = self.color(max_cost).as_hsla();
-        base_color + Color::hsla(0.0, 0.1, 0.15, 0.2)
+        let base_color: LinearRgba = self.color(max_cost).into();
+        (base_color + Color::hsla(0.0, 0.1, 0.15, 0.2).into()).into()
     }
 
     pub(crate) fn velocity_plot_data(&self) -> Vec<[f64; 2]> {
@@ -214,6 +228,16 @@ impl TrajectoryLog {
     pub(crate) fn curvilinear_orientation_plot_data(&self) -> Vec<[f64; 2]> {
         self.kinematic_data
             .curvilinear_orientation_plot_data(Some(self.time_step))
+    }
+
+    pub(crate) fn trajectory_long_plot_data(&self) -> Vec<[f64; 2]> {
+        self.kinematic_data
+            .trajectory_long_plot_data(Some(self.time_step))
+    }
+
+    pub(crate) fn trajectory_lat_plot_data(&self) -> Vec<[f64; 2]> {
+        self.kinematic_data
+            .trajectory_lat_plot_data(Some(self.time_step))
     }
 
     pub(crate) fn sorted_nonzero_costs<'a>(
@@ -318,9 +342,6 @@ pub struct MainTrajectory {
     kinematic_data: KinematicData,
 }
 
-#[derive(Component)]
-pub struct HoveredTrajectory;
-
 pub(crate) fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
     let x_positions_m = mtraj
         .iter()
@@ -374,5 +395,7 @@ pub(crate) fn reassemble_main_trajectory(mtraj: &[MainLog]) -> KinematicData {
         curvilinear_orientations_rad,
         velocities_mps,
         accelerations_mps2,
+        trajectory_long: vec![],
+        trajectory_lat: vec![],
     }
 }

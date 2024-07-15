@@ -1,9 +1,12 @@
+use std::time::Duration;
+
 use bevy::{prelude::*, core::TaskPoolThreadAssignmentPolicy};
 
-use backends::raycast::bevy_mod_raycast::deferred::RaycastSource;
+use backends::raycast::{bevy_mod_raycast::deferred::RaycastSource, RaycastPickable};
 
-#[cfg(feature = "editor")]
-use bevy_editor_pls::prelude::*;
+// Does not support 0.14 yet
+// #[cfg(feature = "editor")]
+// use bevy_editor_pls::prelude::*;
 
 use commonroad_pb::CommonRoad;
 
@@ -32,29 +35,35 @@ impl Resource for CommonRoad {}
 fn main() -> color_eyre::eyre::Result<()> {
     color_eyre::install()?;
 
-    // use clap::Parser;
-    let args = crate::args::Args::parse();
-
-    let cr = read_cr(&args);
-
     let mut app = App::new();
 
-    app.insert_resource(cr)
-        .insert_resource(args)
-        // .insert_resource(bevy::winit::WinitSettings {
-        //     focused_mode: bevy::winit::UpdateMode::ReactiveLowPower { wait: Duration::from_secs(5) },
-        //     unfocused_mode: bevy::winit::UpdateMode::ReactiveLowPower { wait: Duration::from_secs(90) },
-        //     return_from_run: false,
-        // })
-        .add_plugins(CustomDefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Corroscope".into(),
-                // present_mode: bevy::window::PresentMode::AutoNoVsync,
-                present_mode: bevy::window::PresentMode::AutoVsync,
-                // Tells wasm not to override default event handling, like F5, Ctrl+R etc.
-                prevent_default_event_handling: false,
-                ..default()
-            }),
+    {
+        // use clap::Parser;
+        let args = crate::args::Args::parse();
+        let cr = read_cr(&args);
+
+        app.insert_resource(args);
+        app.insert_resource(cr);
+    }
+
+    let mut window = Window {
+        name: Some(env!("CARGO_PKG_NAME").to_string()),
+        title: "Corroscope".into(),
+        // present_mode: bevy::window::PresentMode::AutoNoVsync,
+        present_mode: bevy::window::PresentMode::AutoVsync,
+        // Tells wasm not to override default event handling, like F5, Ctrl+R etc.
+        prevent_default_event_handling: false,
+        ..default()
+    };
+    window.set_maximized(true);
+
+    app
+        .insert_resource(bevy::winit::WinitSettings {
+            focused_mode: bevy::winit::UpdateMode::reactive_low_power(Duration::from_secs(5)),
+            unfocused_mode: bevy::winit::UpdateMode::reactive_low_power(Duration::from_secs(90)),
+        })
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(window),
             exit_condition: bevy::window::ExitCondition::OnPrimaryClosed,
             close_when_requested: true,
         }));
@@ -75,13 +84,17 @@ fn main() -> color_eyre::eyre::Result<()> {
         .add_plugins(bevy_pancam::PanCamPlugin);
 
     // Picking
-    app.add_plugins(DefaultPickingPlugins).insert_resource(
-        bevy_mod_picking::selection::SelectionPluginSettings {
+    app.add_plugins(DefaultPickingPlugins)
+        .insert_resource(bevy_mod_picking::selection::SelectionPluginSettings {
             click_nothing_deselect_all: true,
             use_multiselect_default_inputs: false,
             is_enabled: true,
-        },
-    );
+        },)
+        .insert_resource(bevy_mod_picking::backends::raycast::RaycastBackendSettings {
+            require_markers: true,
+            ..default()
+        })
+        ;
 
     app.add_plugins(global_settings::GlobalSettingsPlugin)
         .add_plugins(elements::ElementsPlugin)
@@ -92,7 +105,11 @@ fn main() -> color_eyre::eyre::Result<()> {
     #[cfg(feature = "debug_picking")]
     {
         use bevy_mod_picking::debug::DebugPickingMode::{Disabled, Normal};
-        app.insert_resource(State(Disabled)).add_systems(
+        // app.insert_resource(State::new(Disabled));
+        app.insert_resource(Normal);
+        /*
+        app.add_systems(
+            Update,
             (
                 (|mut next: ResMut<NextState<_>>| next.set(Normal)).run_if(in_state(Disabled)),
                 (|mut next: ResMut<NextState<_>>| next.set(Disabled)).run_if(in_state(Normal)),
@@ -101,6 +118,7 @@ fn main() -> color_eyre::eyre::Result<()> {
                     bevy::input::common_conditions::input_just_pressed(KeyCode::F3),
                 ),
         );
+         */
     }
 
     #[cfg(feature = "inspector")]
@@ -114,6 +132,8 @@ fn main() -> color_eyre::eyre::Result<()> {
         }
     }
 
+    // Does not support 0.14 yet
+    /*
     #[cfg(feature = "editor")]
     {
         const ENABLE_EDITOR: bool = false;
@@ -128,6 +148,7 @@ fn main() -> color_eyre::eyre::Result<()> {
             }
         }
     }
+    */
 
     #[cfg(feature = "export_schedule")]
     export_dot(&mut app)?;
@@ -175,6 +196,7 @@ pub(crate) fn camera_setup(mut commands: Commands) {
     commands.spawn((
         MainCamera,
         RaycastSource::<()>::new_cursor(),
+        RaycastPickable,
         Camera2dBundle {
             projection: ortho.clone(),
             tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::None,
@@ -314,9 +336,9 @@ impl PluginGroup for CustomDefaultPlugins {
             group = group.add(bevy::asset::AssetPlugin::default());
         }
 
-        {
-            group = group.add(bevy::winit::WinitPlugin::default());
-        }
+        // `{
+        // `    group = group.add(bevy::winit::WinitPlugin::default());
+        // `}
 
         {
             group = group

@@ -45,8 +45,10 @@ pub fn obstacle_tooltip(
     let ctx = contexts.ctx_mut();
 
     let base_id = egui::Id::new("obstacle tooltip");
+    let layer_id = egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("obstacle tooltips"));
+
     for ObstacleData(obs) in obstacle_q.iter() {
-        egui::containers::show_tooltip(ctx, base_id.with(obs.dynamic_obstacle_id), |ui| {
+        egui::containers::show_tooltip(ctx, layer_id, base_id.with(obs.dynamic_obstacle_id), |ui| {
             ui.heading(format!(
                 "Obstacle {} (type {:#?})",
                 obs.dynamic_obstacle_id,
@@ -129,7 +131,7 @@ pub fn spawn_obstacle(
                 ..default()
             },
             Fill::color(Color::WHITE),
-            Stroke::new(Color::ORANGE, 0.2),
+            Stroke::new(bevy::color::palettes::css::ORANGE, 0.2),
             PickableBundle::default(),
             // RaycastPickTarget::default(),
             On::<Pointer<Down>>::target_commands_mut(|_click, _commands| {
@@ -162,7 +164,7 @@ pub fn spawn_obstacle(
             Some(integer_exact_or_interval::ExactOrInterval::Exact(i)) => i,
             _ => unimplemented!(),
         };
-        let ts_color = Color::rgba_u8(
+        let ts_color = Color::srgba_u8(
             130_u8.saturating_sub((time_step as u8).saturating_mul(2)),
             50,
             140,
