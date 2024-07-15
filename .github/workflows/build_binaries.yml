@@ -24,6 +24,12 @@ jobs:
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
 
+      - name: Install libwayland
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install libwayland-client0
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Build binary
