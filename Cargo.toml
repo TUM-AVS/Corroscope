@@ -74,7 +74,7 @@ bevy_polyline = "0.9.0"
 prost-build = "0.12.6"
 
 [features]
-default = [ "dev", "framepace", "wayland", "x11" ]
+default = [ "framepace", "wayland", "x11" ]
 framepace = ["dep:bevy_framepace"]
 dynamic_linking = ["bevy/dynamic_linking"]
 export_schedule = ["dep:bevy_mod_debugdump"]
